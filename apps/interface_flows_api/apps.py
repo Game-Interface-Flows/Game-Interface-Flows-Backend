@@ -6,4 +6,4 @@ class InterfaceFlowsApiConfig(AppConfig):
     name = "apps.interface_flows_api"
 
     def ready(self):
-        import apps.interface_flows_api
+        import apps.interface_flows_api.signals
