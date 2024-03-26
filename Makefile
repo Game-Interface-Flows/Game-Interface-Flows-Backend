@@ -21,7 +21,7 @@ docker_build:
 	docker image build -t game-interface-flows-backend .
 
 docker_run:
-	docker run -p 3000:3000 game-interface-flows-backend
+	docker run -p 8000:8000 game-interface-flows-backend
 
 
 .PHONY: run
