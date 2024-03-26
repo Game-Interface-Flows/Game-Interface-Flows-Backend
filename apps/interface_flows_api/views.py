@@ -34,6 +34,7 @@ class FlowView(APIView):
 class FlowViewDetail(RetrieveAPIView):
     serializer_class = FlowSerializer
     service = FlowService()
+    queryset = service.get_public_flows()
 
     def get(self, request, *args, **kwargs):
         user = request.user
