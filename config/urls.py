@@ -23,9 +23,9 @@ from drf_yasg.views import get_schema_view
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="Chameleon API",
+        title="Game Interface Flows API",
         default_version="v1",
-        description="Description",
+        description="Public API for Game Interface Flows",
         contact=openapi.Contact(email="evlko.oklve@gmail.com"),
     ),
     public=True,
