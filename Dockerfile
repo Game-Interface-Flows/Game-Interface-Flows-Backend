@@ -13,12 +13,14 @@ COPY requirements /app/requirements
 
 RUN pip install --no-cache-dir -r /app/requirements/prod.txt
 
-COPY . /app
+COPY manage.py /app
+
+COPY config app/config
+
+COPY apps /app/apps
 
 WORKDIR /app
 
 EXPOSE 8000
 
 RUN python manage.py collectstatic --noinput
-
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
