@@ -9,9 +9,9 @@ RUN pip install --upgrade pip
 
 ENV PIP_ROOT_USER_ACTION=ignore
 
-COPY requirements.txt /app/requirements.txt
+COPY requirements /app/requirements
 
-RUN pip install --no-cache-dir -r /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements/prod.txt
 
 COPY . /app
 
