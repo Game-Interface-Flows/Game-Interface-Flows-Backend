@@ -9,7 +9,7 @@ import apps.interface_flows_api.config as config
 
 class Profile(Model):
     user = OneToOneField(
-        User, on_delete=models.CASCADE, null=True, blank=True, related_name="profile"
+        User, on_delete=models.CASCADE, null=False, blank=False, related_name="profile"
     )
     profile_photo_url = ImageField(
         upload_to=config.AWS_FOLDER_PROFILES,
@@ -41,7 +41,7 @@ class Flow(Model):
         max_length=2, choices=FlowVisibility.choices, default=FlowVisibility.PUBLIC
     )
     author = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=True, related_name="flow_author"
+        Profile, on_delete=models.CASCADE, null=False, related_name="flows"
     )
     date = DateField(auto_now=False, auto_now_add=True)
 
@@ -58,7 +58,7 @@ class Flow(Model):
 
 
 class Frame(Model):
-    flow = ForeignKey(Flow, on_delete=models.CASCADE, null=True, related_name="frames")
+    flow = ForeignKey(Flow, on_delete=models.CASCADE, null=False, related_name="frames")
     frame = ImageField(upload_to=config.AWS_FOLDER_FRAMES)
     position_x = IntegerField(default=0)
     position_y = IntegerField(default=0)
@@ -82,10 +82,10 @@ class Anchors(TextChoices):
 class Connection(Model):
     bidirectional = BooleanField(default=False)
     frame_out = ForeignKey(
-        Frame, on_delete=models.CASCADE, null=False, related_name="image_out"
+        Frame, on_delete=models.CASCADE, null=False, related_name="connections_out"
     )
     frame_in = ForeignKey(
-        Frame, on_delete=models.CASCADE, null=False, related_name="image_in"
+        Frame, on_delete=models.CASCADE, null=False, related_name="connections_in"
     )
 
     @property
@@ -94,8 +94,6 @@ class Connection(Model):
 
     @property
     def source_anchor(self):
-        if self.frame_out.position_x > 5:
-            return Anchors.LEFT
         return Anchors.TOP
 
     class Meta:
@@ -107,10 +105,10 @@ class Connection(Model):
 
 class Comment(Model):
     author = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=True, related_name="user_comments"
+        Profile, on_delete=models.CASCADE, null=False, related_name="user_comments"
     )
     flow = ForeignKey(
-        Flow, on_delete=models.CASCADE, null=True, related_name="flow_comments"
+        Flow, on_delete=models.CASCADE, null=False, related_name="flow_comments"
     )
     text = TextField(max_length=240)
 

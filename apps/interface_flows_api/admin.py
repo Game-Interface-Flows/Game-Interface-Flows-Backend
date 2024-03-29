@@ -1,5 +1,5 @@
 from django.contrib import admin
 
-from .models import Connection, Flow, Frame, Profile
+from .models import Comment, Connection, Flow, Frame, Like, Profile
 
-admin.site.register([Profile, Flow, Frame, Connection])
+admin.site.register([Profile, Flow, Frame, Connection, Comment, Like])
