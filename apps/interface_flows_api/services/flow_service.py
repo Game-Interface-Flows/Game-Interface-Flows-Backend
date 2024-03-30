@@ -114,3 +114,11 @@ class FlowService:
         self._compute_flow_frames_positions(flow)
 
         return flow
+
+    def comment_flow(self, flow_id: int, user, text: str):
+        try:
+            flow = self.repository.get_flow_by_id(flow_id=flow_id)
+        except ObjectDoesNotExist:
+            raise ObjectDoesNotExist
+        profile = AuthService().get_profile(user)
+        return self.repository.add_comment(text, flow, profile)

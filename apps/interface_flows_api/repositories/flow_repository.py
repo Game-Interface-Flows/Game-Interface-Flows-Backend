@@ -3,8 +3,9 @@ from typing import Set
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 
-from apps.interface_flows_api.models import Connection, Flow, Frame
-from apps.interface_flows_api.serializers import FlowSerializer
+from apps.interface_flows_api.models import (Comment, Connection, Flow, Frame,
+                                             Like, Profile)
+from apps.interface_flows_api.serializers import FlowSerializer, LikeSerializer
 
 
 class FlowRepository:
@@ -51,7 +52,7 @@ class FlowRepository:
         return directed_connected | reverse_connected
 
     @staticmethod
-    def add_flow(data, author) -> Flow:
+    def add_flow(data, author: Profile) -> Flow:
         serializer = FlowSerializer(data=data)
         if serializer.is_valid():
             serializer.save(author=author)
@@ -96,3 +97,12 @@ class FlowRepository:
         connection.save()
 
         return connection
+
+    @staticmethod
+    def add_comment(comment_text: str, flow: Flow, author: Profile) -> Comment:
+        comment = Comment()
+        comment.flow = flow
+        comment.author = author
+        comment.text = comment_text
+        comment.save()
+        return comment

@@ -6,6 +6,8 @@ from .views import *
 urlpatterns = [
     path("flows/", FlowView.as_view()),
     path("flows/<pk>/", FlowDetailView.as_view()),
+    path("flows/<pk>/likes/", FlowLikeView.as_view()),
+    path("flows/<pk>/comments/", FlowCommentView.as_view()),
     path("auth/signup/", CreateUserView.as_view()),
     path("auth/token/", ObtainAuthToken.as_view()),
 ]
