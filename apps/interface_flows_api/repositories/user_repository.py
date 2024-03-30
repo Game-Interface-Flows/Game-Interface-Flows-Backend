@@ -8,7 +8,6 @@ class UserRepository:
     def create_new_user(username, password, email):
         user = User.objects.create_user(username=username, email=email)
         user.set_password(password)
-        print(password)
         user.save()
         return user
 
@@ -18,4 +17,6 @@ class UserRepository:
 
     @staticmethod
     def get_profile_by_user(user):
+        if user.id is None:
+            return None
         return Profile.objects.get(user=user)

@@ -1,5 +1,9 @@
+from django.core.exceptions import ObjectDoesNotExist
 from PIL import Image
 
+import apps.interface_flows_api.config as config
+from apps.interface_flows_api.exceptions import (
+    MLServicesUnavailableException, PrivateFlowException)
 from apps.interface_flows_api.repositories.flow_repository import \
     FlowRepository
 from apps.interface_flows_api.services.auth_service import AuthService
@@ -54,7 +58,13 @@ class FlowService:
 
     def get_flow_by_id(self, flow_id: int, user=None):
         profile = AuthService().get_profile(user)
-        return self.repository.get_flow_by_id(flow_id=flow_id, profile=profile)
+        try:
+            flow = self.repository.get_flow_by_id(flow_id=flow_id)
+        except ObjectDoesNotExist:
+            raise ObjectDoesNotExist
+        if flow.is_public_and_verified is False and profile != flow.author:
+            raise PrivateFlowException
+        return flow
 
     def get_public_flows(
         self, sort: str = "date", order: str = "ASC", limit: int = 10, offset: int = 0
@@ -65,12 +75,27 @@ class FlowService:
         return self.repository.get_available_flows()
 
     def create_new_flow(
-        self, title: str = "Flow Title", description: str = "Flow Desc", frames=None
+        self,
+        title: str,
+        description: str,
+        frames=None,
+        user=None,
     ):
+        profile = AuthService().get_profile(user)
         width, height = self._get_frame_size(frames[0])
-        flow = self.repository.add_flow(title, description, height, width)
+        data = {
+            "title": title,
+            "description": description,
+            "height": height,
+            "width": width,
+        }
+        flow = self.repository.add_flow(data, profile)
 
-        predictions = self.ml_provider.get_direct_graph(frames)
+        try:
+            predictions = self.ml_provider.get_direct_graph(frames)
+        except MLServicesUnavailableException:
+            raise MLServicesUnavailableException
+
         previous_frame = None
 
         for i, prediction in enumerate(predictions):
@@ -79,7 +104,8 @@ class FlowService:
             )
             if (
                 i > 0
-                and predictions[i]["time_out"] - predictions[i - 1]["time_in"] < 100
+                and predictions[i]["time_out"] - predictions[i - 1]["time_in"]
+                < config.MAX_TIME_BETWEEN_SCREENS
             ):
                 self.repository.add_connection(frame_out=previous_frame, frame_in=frame)
 

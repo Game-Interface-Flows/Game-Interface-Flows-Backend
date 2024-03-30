@@ -9,15 +9,15 @@ class ProfileSerializer(ModelSerializer):
 
     class Meta:
         model = Profile
-        fields = "__all__"
+        exclude = ["user"]
 
 
 class UserSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True)
+
     class Meta:
         model = User
         fields = ["id", "username", "password", "email"]
-        # write_only_fields = ("password",)
-        # read_only_fields = ("id",)
 
 
 class ConnectionSerializer(ModelSerializer):
@@ -45,10 +45,11 @@ class CommentSerializer(ModelSerializer):
 
 class FlowSimpleSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
+    author = ProfileSerializer(write_only=True)
 
     class Meta:
         model = Flow
-        fields = ["id", "title", "date", "total_likes"]
+        fields = ["id", "title", "date", "total_likes", "flow_thumbnail_url", "author"]
 
 
 class FlowSerializer(ModelSerializer):
@@ -59,4 +60,4 @@ class FlowSerializer(ModelSerializer):
 
     class Meta:
         model = Flow
-        fields = "__all__"
+        exclude = ["flow_thumbnail_url"]

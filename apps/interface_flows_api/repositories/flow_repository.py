@@ -4,20 +4,17 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 
 from apps.interface_flows_api.models import Connection, Flow, Frame
+from apps.interface_flows_api.serializers import FlowSerializer
 
 
 class FlowRepository:
     @staticmethod
-    def get_flow_by_id(flow_id: int, profile) -> Flow:
+    def get_flow_by_id(flow_id: int) -> Flow:
         try:
             flow = Flow.objects.get(id=flow_id)
+            return flow
         except ObjectDoesNotExist:
-            return None
-        if flow.is_public_and_verified:
-            return flow
-        elif flow.author == profile:
-            return flow
-        return None
+            raise ObjectDoesNotExist
 
     @staticmethod
     def get_public_flows(
@@ -42,24 +39,24 @@ class FlowRepository:
     @staticmethod
     def get_all_frame_connected_frames(frame: Frame) -> Set[Frame]:
         direct_connections = Connection.objects.filter(frame_out=frame)
-        directed_connected = Frame.objects.filter(image_in__in=direct_connections)
+        directed_connected = Frame.objects.filter(connections_in__in=direct_connections)
 
         reverse_connections = Connection.objects.filter(
             Q(frame_in=frame) & Q(bidirectional=True)
         )
-        reverse_connected = Frame.objects.filter(image_out__in=reverse_connections)
+        reverse_connected = Frame.objects.filter(
+            connections_out__in=reverse_connections
+        )
 
         return directed_connected | reverse_connected
 
     @staticmethod
-    def add_flow(title: str, description: str, height: int, width: int) -> Flow:
-        flow = Flow()
-        flow.title = title
-        flow.description = description
-        flow.frames_height = height
-        flow.frames_width = width
-        flow.save()
-        return flow
+    def add_flow(data, author) -> Flow:
+        serializer = FlowSerializer(data=data)
+        if serializer.is_valid():
+            serializer.save(author=author)
+            return serializer.instance
+        return serializer.errors
 
     @staticmethod
     def add_frame(flow: Flow, image) -> Frame:
@@ -79,10 +76,10 @@ class FlowRepository:
     @staticmethod
     def add_connection(frame_out: Frame, frame_in: Frame) -> Connection:
         direct_connection = Connection.objects.filter(
-            Q(frame_out=frame_out) & Q(frame_in=frame_in)
+            Q(connections_out=frame_out) & Q(connections_in=frame_in)
         )
         reverse_connection = Connection.objects.filter(
-            Q(frame_out=frame_in) & Q(frame_in=frame_out)
+            Q(connections_out=frame_in) & Q(connections_in=frame_out)
         )
 
         if direct_connection:
