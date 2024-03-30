@@ -124,3 +124,9 @@ class Like(Model):
     flow = ForeignKey(
         Flow, on_delete=models.CASCADE, null=False, related_name="flow_like"
     )
+
+    class Meta:
+        unique_together = (
+            "user",
+            "flow",
+        )

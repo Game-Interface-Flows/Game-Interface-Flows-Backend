@@ -1,7 +1,7 @@
 from rest_framework import serializers
 from rest_framework.serializers import ModelSerializer
 
-from .models import *
+from apps.interface_flows_api.models import *
 
 
 class ProfileSerializer(ModelSerializer):
@@ -38,9 +38,14 @@ class FrameSerializer(ModelSerializer):
 
 
 class CommentSerializer(ModelSerializer):
+    author = ProfileSerializer(read_only=True)
+    flow = serializers.PrimaryKeyRelatedField(
+        queryset=Flow.objects.all(), write_only=True
+    )
+
     class Meta:
         model = Comment
-        fields = ["id", "text", "author"]
+        fields = "__all__"
 
 
 class FlowSimpleSerializer(ModelSerializer):
@@ -61,3 +66,9 @@ class FlowSerializer(ModelSerializer):
     class Meta:
         model = Flow
         exclude = ["flow_thumbnail_url"]
+
+
+class LikeSerializer(ModelSerializer):
+    class Meta:
+        model = Like
+        fields = "__all__"
