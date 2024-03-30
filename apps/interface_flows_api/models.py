@@ -13,7 +13,7 @@ class Profile(Model):
     )
     profile_photo_url = ImageField(
         upload_to=config.AWS_FOLDER_PROFILES,
-        default=f"{config.AWS_FOLDER_PROFILES}/profile.png",
+        default=f"{config.AWS_FOLDER_PROFILES}/{config.DEFAULT_PROFILE_PIC}",
     )
 
 
@@ -44,6 +44,10 @@ class Flow(Model):
         Profile, on_delete=models.CASCADE, null=False, related_name="flows"
     )
     date = DateField(auto_now=False, auto_now_add=True)
+    flow_thumbnail_url = ImageField(
+        upload_to=config.AWS_FOLDER_THUMBNAILS,
+        default=f"{config.AWS_FOLDER_THUMBNAILS}/{config.DEFAULT_FLOW_THUMBNAIL}",
+    )
 
     @property
     def total_likes(self) -> int:
