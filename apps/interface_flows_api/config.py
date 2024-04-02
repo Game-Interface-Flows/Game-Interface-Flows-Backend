@@ -1,8 +1,10 @@
 # AWS
-AWS_FOLDER_FRAMES = "frames/"
+AWS_FOLDER_SCREENS = "screens/"
 AWS_FOLDER_PROFILES = "profiles/"
 AWS_FOLDER_THUMBNAILS = "flows/"
+AWS_FOLDER_ICONS = "icons/"
 DEFAULT_PROFILE_PIC = "profile.png"
 DEFAULT_FLOW_THUMBNAIL = "thumbnail.png"
+DEFAULT_ICON = "icon.png"
 # ML
 MAX_TIME_BETWEEN_SCREENS = 100

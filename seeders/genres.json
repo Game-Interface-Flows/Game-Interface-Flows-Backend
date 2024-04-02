@@ -1,0 +1,18 @@
+[
+    {
+        "model": "interface_flows_api.genre",
+        "pk": 1,
+        "fields": {
+            "name": "action",
+            "genre_icon_url": "http://storage.yandexcloud.net/game-interface-flows/icons/action.svg"
+        }
+    },
+    {
+        "model": "interface_flows_api.genre",
+        "pk": 2,
+        "fields": {
+            "name": "puzzle",
+            "genre_icon_url": "http://storage.yandexcloud.net/game-interface-flows/icons/puzzle.svg"
+        }
+    }
+]

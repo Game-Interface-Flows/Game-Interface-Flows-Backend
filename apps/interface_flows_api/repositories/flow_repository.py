@@ -1,11 +1,11 @@
-from typing import Set
+from typing import List
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 
-from apps.interface_flows_api.models import (Comment, Connection, Flow, Frame,
-                                             Like, Profile)
-from apps.interface_flows_api.serializers import FlowSerializer, LikeSerializer
+from apps.interface_flows_api.models import (Comment, Connection, Flow, Screen,
+                                             Genre, Platform, Profile)
+from apps.interface_flows_api.serializers import FlowSerializer
 
 
 class FlowRepository:
@@ -19,40 +19,52 @@ class FlowRepository:
 
     @staticmethod
     def get_public_flows(
-        sort: str = "date", order: str = "ASC", limit: int = 10, offset: int = 0
-    ):
+        sort: str = "date",
+        order: str = "ASC",
+        limit: int = 10,
+        offset: int = 0,
+        genres=None,
+        platforms=None,
+    ) -> QuerySet[Flow]:
         """
+        filter options: genres, platforms
         order options: date, title, likes
         """
+        flows = Flow.objects.filter(visibility="PB", status="VR")
+        # if genres:
+        #    flows = flows.filter(genres__in=genres)
+        # if platforms:
+        #    flows = flows.filter(platforms__in=platforms)
         order_option = sort if order == "ASC" else f"-{sort}"
-        return Flow.objects.filter(visibility="PB", status="VR").order_by(order_option)[
-            offset:limit
-        ]
+        return flows.order_by(order_option)[offset:limit]
 
     @staticmethod
-    def get_available_flows():
-        return Flow.objects.all()
+    def get_flow_screens(flow: Flow) -> QuerySet[Screen]:
+        return Screen.objects.filter(flow=flow)
 
     @staticmethod
-    def get_all_flow_frames(flow: Flow):
-        return Frame.objects.filter(flow=flow)
-
-    @staticmethod
-    def get_all_frame_connected_frames(frame: Frame) -> Set[Frame]:
-        direct_connections = Connection.objects.filter(frame_out=frame)
-        directed_connected = Frame.objects.filter(connections_in__in=direct_connections)
+    def get_connected_screens(screen: Screen) -> QuerySet[Screen]:
+        direct_connections = Connection.objects.filter(screen_out=screen)
+        directed_connected = Screen.objects.filter(connections_in__in=direct_connections)
 
         reverse_connections = Connection.objects.filter(
-            Q(frame_in=frame) & Q(bidirectional=True)
+            screen_in=screen, bidirectional=True
         )
-        reverse_connected = Frame.objects.filter(
+
+        reverse_connected = Screen.objects.filter(
             connections_out__in=reverse_connections
         )
 
-        return directed_connected | reverse_connected
+        return directed_connected.union(reverse_connected)
 
     @staticmethod
-    def add_flow(data, author: Profile) -> Flow:
+    def add_flow(title: str, description: str, width: int, height: int, author: Profile) -> Flow:
+        data = {
+            "title": title,
+            "description": description,
+            "screens_height": height,
+            "screens_width": width,
+        }
         serializer = FlowSerializer(data=data)
         if serializer.is_valid():
             serializer.save(author=author)
@@ -60,28 +72,40 @@ class FlowRepository:
         return serializer.errors
 
     @staticmethod
-    def add_frame(flow: Flow, image) -> Frame:
-        frame = Frame()
-        frame.flow = flow
-        frame.frame = image
-        frame.save()
-        return frame
+    def add_screen(flow: Flow, number: int, image) -> Screen:
+        screen = Screen()
+        screen.flow = flow
+        screen.flow_screen_number = number
+        screen.image = image
+        screen.save()
+        return screen
 
     @staticmethod
-    def update_frame_pos(frame: Frame, pos_x: float, pos_y: float) -> Frame:
-        frame.position_x = pos_x
-        frame.position_y = pos_y
-        frame.save()
-        return frame
+    def get_screen(flow: Flow, flow_screen_number: int) -> Screen:
+        return Screen.objects.get(flow=flow, flow_screen_number=flow_screen_number)
 
     @staticmethod
-    def add_connection(frame_out: Frame, frame_in: Frame) -> Connection:
-        direct_connection = Connection.objects.filter(
-            Q(connections_out=frame_out) & Q(connections_in=frame_in)
-        )
-        reverse_connection = Connection.objects.filter(
-            Q(connections_out=frame_in) & Q(connections_in=frame_out)
-        )
+    def update_screen_pos(screen: Screen, pos_x: float, pos_y: float) -> Screen:
+        screen.position_x = pos_x
+        screen.position_y = pos_y
+        screen.save()
+        return screen
+
+    @staticmethod
+    def add_connection(screen_out: Screen, screen_in: Screen) -> Connection:
+        try:
+            direct_connection = Connection.objects.get(
+                Q(screen_out=screen_out) & Q(screen_in=screen_in)
+            )
+        except ObjectDoesNotExist:
+            direct_connection = None
+
+        try:
+            reverse_connection = Connection.objects.get(
+                Q(screen_out=screen_in) & Q(screen_in=screen_out)
+            )
+        except ObjectDoesNotExist:
+            reverse_connection = None
 
         if direct_connection:
             return direct_connection
@@ -92,8 +116,8 @@ class FlowRepository:
             return reverse_connection
 
         connection = Connection()
-        connection.frame_out = frame_out
-        connection.frame_in = frame_in
+        connection.screen_out = screen_out
+        connection.screen_in = screen_in
         connection.save()
 
         return connection
@@ -106,3 +130,18 @@ class FlowRepository:
         comment.text = comment_text
         comment.save()
         return comment
+
+    @staticmethod
+    def get_genres_by_names(names: List[str] = None) -> QuerySet[Genre]:
+        if names is None:
+            return Genre.objects.all()
+        return Genre.objects.filter(name__in=names)
+
+    @staticmethod
+    def get_platforms_by_names(names: List[str] = None) -> QuerySet[Platform]:
+        if names is None:
+            return Platform.objects.all()
+        return Platform.objects.filter(name__in=names)
+
+
+flow_repository = FlowRepository()

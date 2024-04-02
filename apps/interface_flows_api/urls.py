@@ -4,6 +4,8 @@ from rest_framework.authtoken.views import ObtainAuthToken
 from .views import *
 
 urlpatterns = [
+    path("genres/", GenresView.as_view()),
+    path("platforms", PlatformsView.as_view()),
     path("flows/", FlowView.as_view()),
     path("flows/<pk>/", FlowDetailView.as_view()),
     path("flows/<pk>/likes/", FlowLikeView.as_view()),

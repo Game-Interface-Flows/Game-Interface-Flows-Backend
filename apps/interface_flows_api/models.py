@@ -1,8 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import (BooleanField, DateField, FloatField, ForeignKey,
-                              ImageField, IntegerField, Model, OneToOneField,
-                              Q, TextChoices, TextField)
+from django.db.models import (BooleanField, DateField, ForeignKey, ImageField,
+                              IntegerField, Model, OneToOneField,
+                              TextChoices, TextField)
 
 import apps.interface_flows_api.config as config
 
@@ -15,6 +15,28 @@ class Profile(Model):
         upload_to=config.AWS_FOLDER_PROFILES,
         default=f"{config.AWS_FOLDER_PROFILES}/{config.DEFAULT_PROFILE_PIC}",
     )
+
+
+class Platform(Model):
+    name = TextField(max_length=64, unique=True)
+    platform_icon_url = ImageField(
+        upload_to=config.AWS_FOLDER_ICONS,
+        default=f"{config.AWS_FOLDER_ICONS}/{config.DEFAULT_ICON}",
+    )
+
+    def __str__(self):
+        return self.name
+
+
+class Genre(Model):
+    name = TextField(max_length=64, unique=True)
+    genre_icon_url = ImageField(
+        upload_to=config.AWS_FOLDER_ICONS,
+        default=f"{config.AWS_FOLDER_ICONS}/{config.DEFAULT_ICON}",
+    )
+
+    def __str__(self):
+        return self.name
 
 
 class FlowStatus(TextChoices):
@@ -30,8 +52,8 @@ class FlowVisibility(TextChoices):
 class Flow(Model):
     title = TextField()
     description = TextField()
-    frames_width = IntegerField(default=480)
-    frames_height = IntegerField(default=270)
+    screens_width = IntegerField(default=480)
+    screens_height = IntegerField(default=270)
     status = models.CharField(
         max_length=2,
         choices=FlowStatus.choices,
@@ -48,6 +70,8 @@ class Flow(Model):
         upload_to=config.AWS_FOLDER_THUMBNAILS,
         default=f"{config.AWS_FOLDER_THUMBNAILS}/{config.DEFAULT_FLOW_THUMBNAIL}",
     )
+    genres = models.ManyToManyField(Genre, related_name="genres", blank=True)
+    platforms = models.ManyToManyField(Platform, related_name="platforms", blank=True)
 
     @property
     def total_likes(self) -> int:
@@ -60,20 +84,23 @@ class Flow(Model):
             and self.status == FlowStatus.VERIFIED
         )
 
+    def __str__(self):
+        return self.title
 
-class Frame(Model):
-    flow = ForeignKey(Flow, on_delete=models.CASCADE, null=False, related_name="frames")
-    frame = ImageField(upload_to=config.AWS_FOLDER_FRAMES)
+
+class Screen(Model):
+    flow = ForeignKey(Flow, on_delete=models.CASCADE, null=False, related_name="screens")
+    flow_screen_number = IntegerField()
+    image = ImageField(upload_to=config.AWS_FOLDER_SCREENS)
     position_x = IntegerField(default=0)
     position_y = IntegerField(default=0)
 
-    @property
-    def count_out_connections(self):
-        return len(
-            Connection.objects.filter(
-                Q(image_out=self) | (Q(image_in=self) & Q(bidirectional=True))
-            )
+    class Meta:
+        unique_together = (
+            "flow",
+            "flow_screen_number",
         )
+        ordering = ["position_y", "position_x"]
 
 
 class Anchors(TextChoices):
@@ -85,11 +112,11 @@ class Anchors(TextChoices):
 
 class Connection(Model):
     bidirectional = BooleanField(default=False)
-    frame_out = ForeignKey(
-        Frame, on_delete=models.CASCADE, null=False, related_name="connections_out"
+    screen_out = ForeignKey(
+        Screen, on_delete=models.CASCADE, null=False, related_name="connections_out"
     )
-    frame_in = ForeignKey(
-        Frame, on_delete=models.CASCADE, null=False, related_name="connections_in"
+    screen_in = ForeignKey(
+        Screen, on_delete=models.CASCADE, null=False, related_name="connections_in"
     )
 
     @property
@@ -102,8 +129,8 @@ class Connection(Model):
 
     class Meta:
         unique_together = (
-            "frame_out",
-            "frame_in",
+            "screen_out",
+            "screen_in",
         )
 
 

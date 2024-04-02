@@ -1,63 +1,64 @@
+from typing import List
+
 from django.core.exceptions import ObjectDoesNotExist
 from PIL import Image
 
 import apps.interface_flows_api.config as config
 from apps.interface_flows_api.exceptions import (
     MLServicesUnavailableException, PrivateFlowException)
+from apps.interface_flows_api.models import Comment, Flow, Screen, User
 from apps.interface_flows_api.repositories.flow_repository import \
-    FlowRepository
-from apps.interface_flows_api.services.auth_service import AuthService
-from apps.interface_flows_api.services.ml_provider import \
-    MachineLearningProvider
+    flow_repository
+from apps.interface_flows_api.services.auth_service import auth_service
+from apps.interface_flows_api.services.ml_provider import ml_service_provider
 
 
 class FlowService:
-    repository = FlowRepository()
-    ml_provider = MachineLearningProvider()
+    def __init__(self, repository):
+        self.repository = repository
 
     @staticmethod
-    def _get_frame_size(image_file):
-        image = Image.open(image_file)
+    def _get_screen_size(image_bytes: bytes) -> (int, int):
+        image = Image.open(image_bytes)
         width, height = image.size
         return width, height
 
-    def _compute_flow_frames_positions(self, flow) -> None:
-        frames = self.repository.get_all_flow_frames(flow)
+    def _dfs(self, visited: set, graph: dict, node: Screen, x: int, y: int):
+        if node not in visited:
+            self.repository.update_screen_pos(node, x, y)
+            visited.add(node)
+            i = 0
+            for neighbour in graph[node]:
+                next_x = x + 1
+                next_y = y + 1 if i > 0 else y
+                dy = self._dfs(visited, graph, neighbour, next_x, next_y)
+                if dy is None:
+                    continue
+                y = dy
+                i += 1
+            del graph[node]
+            return y
+        return None
+
+    def _compute_flow_screens_positions(self, flow) -> List[Screen]:
+        screens = self.repository.get_flow_screens(flow)
         graph = {}
 
-        for frame in frames:
-            graph[frame] = self.repository.get_all_frame_connected_frames(frame)
+        for screen in screens:
+            graph[screen] = self.repository.get_connected_screens(screen)
 
-        height = []
-        stack = [(max(graph, key=lambda x: len(graph[x])), 0)]
         visited = set()
+        y = 0
 
-        while len(stack) > 0:
-            current_frame, pos_x = stack.pop()
+        while len(graph) != 0:
+            current_node = max(graph, key=lambda x: len(graph[x]))
+            y = self._dfs(visited, graph, current_node, 0, y)
+            y += 1
 
-            if len(height) <= pos_x:
-                height.append(0)
+        return screens
 
-            pos_y = height[pos_x]
-            height[pos_x] += 1
-
-            self.repository.update_frame_pos(current_frame, pos_x, pos_y)
-
-            visited.add(current_frame)
-            connected_frames = graph[current_frame]
-
-            for frame in connected_frames:
-                if frame not in visited:
-                    stack.append((frame, pos_x + 1))
-
-            if len(stack) == 0:
-                not_visited = list(visited - set(graph.keys()))
-                if len(not_visited) == 0:
-                    break
-                stack.append((graph[not_visited[0]], 0))
-
-    def get_flow_by_id(self, flow_id: int, user=None):
-        profile = AuthService().get_profile(user)
+    def get_flow_by_id(self, flow_id: int, user: User = None) -> Flow:
+        profile = auth_service.get_profile(user)
         try:
             flow = self.repository.get_flow_by_id(flow_id=flow_id)
         except ObjectDoesNotExist:
@@ -67,58 +68,72 @@ class FlowService:
         return flow
 
     def get_public_flows(
-        self, sort: str = "date", order: str = "ASC", limit: int = 10, offset: int = 0
-    ):
-        return self.repository.get_public_flows(sort, order, limit, offset)
-
-    def get_available_flows(self):
-        return self.repository.get_available_flows()
+        self,
+        sort: str = "date",
+        order: str = "ASC",
+        limit: int = 10,
+        offset: int = 0,
+        genres: List[str] = None,
+        platforms: List[str] = None,
+    ) -> List[Flow]:
+        genres = self.repository.get_genres_by_names(genres)
+        platforms = self.repository.get_platforms_by_names(platforms)
+        return self.repository.get_public_flows(
+            sort, order, limit, offset, genres, platforms
+        )
 
     def create_new_flow(
         self,
         title: str,
         description: str,
-        frames=None,
-        user=None,
-    ):
-        profile = AuthService().get_profile(user)
-        width, height = self._get_frame_size(frames[0])
-        data = {
-            "title": title,
-            "description": description,
-            "height": height,
-            "width": width,
-        }
-        flow = self.repository.add_flow(data, profile)
+        frames: List[bytes],
+        user: User,
+    ) -> Flow:
+        profile = auth_service.get_profile(user)
+        width, height = self._get_screen_size(frames[0])
+        print(width, height)
+        flow = self.repository.add_flow(title, description, width, height, profile)
 
         try:
-            predictions = self.ml_provider.get_direct_graph(frames)
+            predictions = ml_service_provider.get_direct_graph(frames)
         except MLServicesUnavailableException:
             raise MLServicesUnavailableException
 
-        previous_frame = None
+        previous_screen = None
+        seen_screens_indices = set()
 
         for i, prediction in enumerate(predictions):
-            frame = self.repository.add_frame(
-                flow=flow, image=frames[prediction["index"]]
-            )
+            if prediction["index"] not in seen_screens_indices:
+                screen = self.repository.add_screen(
+                    flow=flow,
+                    image=frames[prediction["index"]],
+                    number=prediction["index"],
+                )
+                seen_screens_indices.add(prediction["index"])
+            else:
+                screen = self.repository.get_screen(flow, prediction["index"])
             if (
                 i > 0
-                and predictions[i]["time_out"] - predictions[i - 1]["time_in"]
+                and predictions[i]["time_in"] - predictions[i - 1]["time_out"]
                 < config.MAX_TIME_BETWEEN_SCREENS
             ):
-                self.repository.add_connection(frame_out=previous_frame, frame_in=frame)
+                self.repository.add_connection(
+                    screen_out=previous_screen, screen_in=screen
+                )
 
-            previous_frame = frame
+            previous_screen = screen
 
-        self._compute_flow_frames_positions(flow)
+        self._compute_flow_screens_positions(flow)
 
         return flow
 
-    def comment_flow(self, flow_id: int, user, text: str):
+    def comment_flow(self, flow_id: int, user: User, text: str) -> Comment:
         try:
             flow = self.repository.get_flow_by_id(flow_id=flow_id)
         except ObjectDoesNotExist:
             raise ObjectDoesNotExist
-        profile = AuthService().get_profile(user)
+        profile = auth_service.get_profile(user)
         return self.repository.add_comment(text, flow, profile)
+
+
+flow_service = FlowService(flow_repository)

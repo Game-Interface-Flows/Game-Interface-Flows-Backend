@@ -29,12 +29,19 @@ class ConnectionSerializer(ModelSerializer):
         fields = "__all__"
 
 
-class FrameSerializer(ModelSerializer):
-    image_out = ConnectionSerializer(read_only=True, many=True)
+class ScreenSerializer(ModelSerializer):
+    connections_out = ConnectionSerializer(read_only=True, many=True)
 
     class Meta:
-        model = Frame
-        fields = ["id", "frame", "position_x", "position_y", "image_out"]
+        model = Screen
+        fields = [
+            "id",
+            "flow_screen_number",
+            "image",
+            "position_x",
+            "position_y",
+            "connections_out",
+        ]
 
 
 class CommentSerializer(ModelSerializer):
@@ -57,11 +64,25 @@ class FlowSimpleSerializer(ModelSerializer):
         fields = ["id", "title", "date", "total_likes", "flow_thumbnail_url", "author"]
 
 
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = "__all__"
+
+
+class PlatformSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Platform
+        fields = "__all__"
+
+
 class FlowSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
-    frames = FrameSerializer(read_only=True, many=True)
+    screens = ScreenSerializer(read_only=True, many=True)
     flow_comments = CommentSerializer(read_only=True, many=True)
     author = ProfileSerializer(read_only=True)
+    genres = GenreSerializer(many=True, read_only=True)
+    platforms = PlatformSerializer(many=True, read_only=True)
 
     class Meta:
         model = Flow

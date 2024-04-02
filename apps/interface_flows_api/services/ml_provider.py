@@ -5,8 +5,9 @@ import requests
 from apps.interface_flows_api.exceptions import MLServicesUnavailableException
 
 
-class MachineLearningProvider:
-    ml_service_url = os.getenv("ML_SERVICE_URL")
+class MachineLearningServiceProvider:
+    def __init__(self, url):
+        self.ml_service_url = url
 
     def get_direct_graph(self, frames):
         files_to_send = [
@@ -19,3 +20,6 @@ class MachineLearningProvider:
             return flow_graph
         except requests.exceptions.RequestException as e:
             raise MLServicesUnavailableException(f"ML service call failed: {e}")
+
+
+ml_service_provider = MachineLearningServiceProvider(os.getenv("ML_SERVICE_URL"))

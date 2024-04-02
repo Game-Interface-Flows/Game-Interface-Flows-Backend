@@ -11,12 +11,12 @@ from apps.interface_flows_api.exceptions import (
 from apps.interface_flows_api.responses import (NonAuthoritativeResponse,
                                                 NotFoundResponse)
 from apps.interface_flows_api.serializers import *
-from apps.interface_flows_api.services.auth_service import AuthService
-from apps.interface_flows_api.services.flow_service import FlowService
+from apps.interface_flows_api.services.auth_service import auth_service
+from apps.interface_flows_api.services.flow_service import flow_service
 
 
 class FlowView(APIView):
-    service = FlowService()
+    service = flow_service
 
     def get_permissions(self):
         if self.request.method == "POST":
@@ -26,13 +26,15 @@ class FlowView(APIView):
             self.permission_classes = [AllowAny]
         return super().get_permissions()
 
-    def get(self, request):
-        sort_param = self.request.GET.get("sort", "date")
-        order_param = self.request.GET.get("order", "DESC")
-        limit_param = int(self.request.GET.get("limit", 10))
-        offset_param = int(self.request.GET.get("offset", 0))
+    def get(self, request, *args, **kwargs):
+        sort_param = request.query_params.get("sort", "date")
+        order_param = request.query_params.get("order", "DESC")
+        limit_param = int(request.query_params.get("limit", 10))
+        offset_param = int(request.query_params.get("offset", 0))
+        genres = request.query_params.getlist("genre")
+        platforms = request.query_params.getlist("platform")
         flows = self.service.get_public_flows(
-            sort_param, order_param, limit_param, offset_param
+            sort_param, order_param, limit_param, offset_param, genres, platforms
         )
         serializer = FlowSimpleSerializer(flows, many=True)
         return Response(serializer.data)
@@ -40,10 +42,14 @@ class FlowView(APIView):
     def post(self, request, *args, **kwargs):
         user = request.user
         frames = request.FILES.getlist("frames")
+        flow_title = request.data["title"]
+        flow_description = request.data["description"]
         if frames is None:
             return Response()
         try:
-            flow = self.service.create_new_flow(frames=frames, user=user)
+            flow = self.service.create_new_flow(
+                frames=frames, user=user, title=flow_title, description=flow_description
+            )
             serializer = FlowSerializer(flow)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except MLServicesUnavailableException as e:
@@ -60,7 +66,7 @@ class FlowView(APIView):
 
 class FlowDetailView(RetrieveAPIView):
     serializer_class = FlowSerializer
-    service = FlowService()
+    service = flow_service
     queryset = service.get_public_flows()
     object_name = "flow"
 
@@ -80,19 +86,19 @@ class FlowDetailView(RetrieveAPIView):
 class FlowLikeView(CreateAPIView, DestroyAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    service = FlowService()
+    service = flow_service
     serializer_class = LikeSerializer
     queryset = Like.objects.all()
 
     def create(self, request, *args, **kwargs):
         user = request.user
-        request.data["user"] = AuthService().get_profile(user).id
+        request.data["user"] = auth_service.get_profile(user).id
         request.data["flow"] = self.kwargs["pk"]
         return super().create(request, *args, **kwargs)
 
     def get_object(self):
         user = self.request.user
-        profile_id = AuthService().get_profile(user).id
+        profile_id = auth_service.get_profile(user).id
         flow_id = self.kwargs["pk"]
         obj = get_object_or_404(Like, flow=flow_id, user=profile_id)
         return obj
@@ -102,7 +108,7 @@ class FlowCommentView(CreateAPIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = CommentSerializer
-    service = FlowService()
+    service = flow_service
 
     def post(self, request, *args, **kwargs):
         flow_id = self.kwargs["pk"]
@@ -123,7 +129,7 @@ class FlowCommentView(CreateAPIView):
 
 class CreateUserView(CreateAPIView):
     serializer_class = UserSerializer
-    service = AuthService()
+    service = auth_service
 
     def post(self, request, *args, **kwargs):
         username = request.data["username"]
@@ -132,3 +138,13 @@ class CreateUserView(CreateAPIView):
         user = self.service.create_user(username, password, email=email)
         serializer = self.serializer_class(user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class GenresView(ListAPIView):
+    queryset = Genre.objects.all()
+    serializer_class = GenreSerializer
+
+
+class PlatformsView(ListAPIView):
+    queryset = Platform.objects.all()
+    serializer_class = PlatformSerializer
