@@ -17,7 +17,7 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "username", "password", "email"]
+        fields = ["username", "password", "email"]
 
 
 class ConnectionSerializer(ModelSerializer):
@@ -27,6 +27,15 @@ class ConnectionSerializer(ModelSerializer):
     class Meta:
         model = Connection
         fields = "__all__"
+
+
+class ScreenVisualPropertiesSerializer(ModelSerializer):
+    offset_x = serializers.ReadOnlyField()
+    offset_y = serializers.ReadOnlyField()
+
+    class Meta:
+        model = ScreenVisualProperties
+        exclude = ["id"]
 
 
 class ScreenSerializer(ModelSerializer):
@@ -83,6 +92,7 @@ class FlowSerializer(ModelSerializer):
     author = ProfileSerializer(read_only=True)
     genres = GenreSerializer(many=True, read_only=True)
     platforms = PlatformSerializer(many=True, read_only=True)
+    screens_properties = ScreenVisualPropertiesSerializer(read_only=True)
 
     class Meta:
         model = Flow

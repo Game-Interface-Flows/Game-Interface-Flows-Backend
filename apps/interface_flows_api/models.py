@@ -1,8 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import (BooleanField, DateField, ForeignKey, ImageField,
-                              IntegerField, Model, OneToOneField,
-                              TextChoices, TextField)
+from django.db.models import (BooleanField, CharField, DateField, ForeignKey,
+                              ImageField, IntegerField, ManyToManyField, Model,
+                              OneToOneField, TextChoices, TextField)
 
 import apps.interface_flows_api.config as config
 
@@ -49,17 +49,36 @@ class FlowVisibility(TextChoices):
     PRIVATE = "PV"
 
 
+class ScreenVisualProperties(Model):
+    width = IntegerField(default=480)
+    height = IntegerField(default=270)
+
+    class Meta:
+        unique_together = (
+            "width",
+            "height",
+        )
+
+    @property
+    def offset_x(self):
+        width = self.width.value_to_string(self)
+        return round(int(width) * config.WIDTH_RATIO)
+
+    @property
+    def offset_y(self):
+        height = self.height.value_to_string(self)
+        return round(int(height) * config.HEIGHT_RATIO)
+
+
 class Flow(Model):
     title = TextField()
     description = TextField()
-    screens_width = IntegerField(default=480)
-    screens_height = IntegerField(default=270)
-    status = models.CharField(
+    status = CharField(
         max_length=2,
         choices=FlowStatus.choices,
         default=FlowStatus.ON_MODERATION,
     )
-    visibility = models.CharField(
+    visibility = CharField(
         max_length=2, choices=FlowVisibility.choices, default=FlowVisibility.PUBLIC
     )
     author = ForeignKey(
@@ -70,8 +89,15 @@ class Flow(Model):
         upload_to=config.AWS_FOLDER_THUMBNAILS,
         default=f"{config.AWS_FOLDER_THUMBNAILS}/{config.DEFAULT_FLOW_THUMBNAIL}",
     )
-    genres = models.ManyToManyField(Genre, related_name="genres", blank=True)
-    platforms = models.ManyToManyField(Platform, related_name="platforms", blank=True)
+    genres = ManyToManyField(Genre, related_name="genres", blank=True)
+    platforms = ManyToManyField(Platform, related_name="platforms", blank=True)
+    screens_properties = ForeignKey(
+        ScreenVisualProperties,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="flows",
+    )
 
     @property
     def total_likes(self) -> int:
@@ -89,7 +115,9 @@ class Flow(Model):
 
 
 class Screen(Model):
-    flow = ForeignKey(Flow, on_delete=models.CASCADE, null=False, related_name="screens")
+    flow = ForeignKey(
+        Flow, on_delete=models.CASCADE, null=False, related_name="screens"
+    )
     flow_screen_number = IntegerField()
     image = ImageField(upload_to=config.AWS_FOLDER_SCREENS)
     position_x = IntegerField(default=0)

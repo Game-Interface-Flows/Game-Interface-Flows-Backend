@@ -91,9 +91,8 @@ class FlowService:
     ) -> Flow:
         profile = auth_service.get_profile(user)
         width, height = self._get_screen_size(frames[0])
-        print(width, height)
         flow = self.repository.add_flow(title, description, width, height, profile)
-
+        
         try:
             predictions = ml_service_provider.get_direct_graph(frames)
         except MLServicesUnavailableException:

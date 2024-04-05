@@ -3,9 +3,11 @@ from typing import List
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q, QuerySet
 
-from apps.interface_flows_api.models import (Comment, Connection, Flow, Screen,
-                                             Genre, Platform, Profile)
-from apps.interface_flows_api.serializers import FlowSerializer
+from apps.interface_flows_api.models import (Comment, Connection, Flow, Genre,
+                                             Platform, Profile, Screen,
+                                             ScreenVisualProperties)
+from apps.interface_flows_api.serializers import (
+    FlowSerializer, FlowSimpleSerializer, ScreenVisualPropertiesSerializer)
 
 
 class FlowRepository:
@@ -45,7 +47,9 @@ class FlowRepository:
     @staticmethod
     def get_connected_screens(screen: Screen) -> QuerySet[Screen]:
         direct_connections = Connection.objects.filter(screen_out=screen)
-        directed_connected = Screen.objects.filter(connections_in__in=direct_connections)
+        directed_connected = Screen.objects.filter(
+            connections_in__in=direct_connections
+        )
 
         reverse_connections = Connection.objects.filter(
             screen_in=screen, bidirectional=True
@@ -58,16 +62,29 @@ class FlowRepository:
         return directed_connected.union(reverse_connected)
 
     @staticmethod
-    def add_flow(title: str, description: str, width: int, height: int, author: Profile) -> Flow:
+    def add_get_screen_properties(width: int, height: int) -> ScreenVisualProperties:
+        try:
+            screen_properties = ScreenVisualProperties.objects.get(
+                width=width, height=height
+            )
+        except ObjectDoesNotExist:
+            screen_properties = ScreenVisualProperties()
+            screen_properties.width = width
+            screen_properties.height = height
+            screen_properties.save()
+        return screen_properties
+
+    def add_flow(
+        self, title: str, description: str, width: int, height: int, author: Profile
+    ) -> Flow:
+        screen_properties = self.add_get_screen_properties(width, height)
         data = {
             "title": title,
             "description": description,
-            "screens_height": height,
-            "screens_width": width,
         }
         serializer = FlowSerializer(data=data)
         if serializer.is_valid():
-            serializer.save(author=author)
+            serializer.save(author=author, screens_properties=screen_properties)
             return serializer.instance
         return serializer.errors
 
