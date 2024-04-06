@@ -1,20 +1,21 @@
 from typing import List
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import QuerySet
 from PIL import Image
 
 import apps.interface_flows_api.config as config
 from apps.interface_flows_api.exceptions import (
     MLServicesUnavailableException, PrivateFlowException)
 from apps.interface_flows_api.models import Comment, Flow, Screen, User
-from apps.interface_flows_api.repositories.flow_repository import \
-    flow_repository
+from apps.interface_flows_api.repositories.flow_repository import (
+    FlowRepository, flow_repository)
 from apps.interface_flows_api.services.auth_service import auth_service
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
 
 
 class FlowService:
-    def __init__(self, repository):
+    def __init__(self, repository: FlowRepository):
         self.repository = repository
 
     @staticmethod
@@ -23,7 +24,9 @@ class FlowService:
         width, height = image.size
         return width, height
 
-    def _dfs(self, visited: set, graph: dict, node: Screen, x: int, y: int):
+    def _dfs(
+        self, visited: set, graph: dict, node: Screen, x: int, y: int
+    ) -> int | None:
         if node not in visited:
             self.repository.update_screen_pos(node, x, y)
             visited.add(node)
@@ -40,7 +43,7 @@ class FlowService:
             return y
         return None
 
-    def _compute_flow_screens_positions(self, flow) -> List[Screen]:
+    def _compute_flow_screens_positions(self, flow: Flow) -> QuerySet[Screen]:
         screens = self.repository.get_flow_screens(flow)
         graph = {}
 
@@ -71,16 +74,12 @@ class FlowService:
         self,
         sort: str = "date",
         order: str = "ASC",
-        limit: int = 10,
-        offset: int = 0,
         genres: List[str] = None,
         platforms: List[str] = None,
-    ) -> List[Flow]:
+    ) -> QuerySet[Flow]:
         genres = self.repository.get_genres_by_names(genres)
         platforms = self.repository.get_platforms_by_names(platforms)
-        return self.repository.get_public_flows(
-            sort, order, limit, offset, genres, platforms
-        )
+        return self.repository.get_public_flows(sort, order, genres, platforms)
 
     def create_new_flow(
         self,
@@ -92,7 +91,7 @@ class FlowService:
         profile = auth_service.get_profile(user)
         width, height = self._get_screen_size(frames[0])
         flow = self.repository.add_flow(title, description, width, height, profile)
-        
+
         try:
             predictions = ml_service_provider.get_direct_graph(frames)
         except MLServicesUnavailableException:
@@ -129,9 +128,9 @@ class FlowService:
     def comment_flow(self, flow_id: int, user: User, text: str) -> Comment:
         try:
             flow = self.repository.get_flow_by_id(flow_id=flow_id)
+            profile = auth_service.get_profile(user)
         except ObjectDoesNotExist:
             raise ObjectDoesNotExist
-        profile = auth_service.get_profile(user)
         return self.repository.add_comment(text, flow, profile)
 
 

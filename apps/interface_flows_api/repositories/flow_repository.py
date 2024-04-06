@@ -1,16 +1,17 @@
 from typing import List
 
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q, QuerySet
+from django.core.paginator import Paginator
+from django.db.models import QuerySet
 
 from apps.interface_flows_api.models import (Comment, Connection, Flow, Genre,
                                              Platform, Profile, Screen,
                                              ScreenVisualProperties)
-from apps.interface_flows_api.serializers import (
-    FlowSerializer, FlowSimpleSerializer, ScreenVisualPropertiesSerializer)
+from apps.interface_flows_api.repositories.repository import IRepository
+from apps.interface_flows_api.serializers import FlowSerializer
 
 
-class FlowRepository:
+class FlowRepository(IRepository):
     @staticmethod
     def get_flow_by_id(flow_id: int) -> Flow:
         try:
@@ -19,26 +20,25 @@ class FlowRepository:
         except ObjectDoesNotExist:
             raise ObjectDoesNotExist
 
-    @staticmethod
     def get_public_flows(
+        self,
         sort: str = "date",
-        order: str = "ASC",
-        limit: int = 10,
-        offset: int = 0,
-        genres=None,
-        platforms=None,
+        order: str = "asc",
+        genres: QuerySet[Genre] = None,
+        platforms: QuerySet[Platform] = None,
     ) -> QuerySet[Flow]:
         """
         filter options: genres, platforms
-        order options: date, title, likes
+        sort options: date, title, likes
+        order options: asc or desc
         """
         flows = Flow.objects.filter(visibility="PB", status="VR")
-        # if genres:
-        #    flows = flows.filter(genres__in=genres)
-        # if platforms:
-        #    flows = flows.filter(platforms__in=platforms)
-        order_option = sort if order == "ASC" else f"-{sort}"
-        return flows.order_by(order_option)[offset:limit]
+        if genres:
+            flows = flows.filter(genres__in=genres)
+        if platforms:
+            flows = flows.filter(platforms__in=platforms)
+        order_option = self.get_order_option(sort, order)
+        return flows.order_by(order_option)
 
     @staticmethod
     def get_flow_screens(flow: Flow) -> QuerySet[Screen]:
@@ -63,16 +63,10 @@ class FlowRepository:
 
     @staticmethod
     def add_get_screen_properties(width: int, height: int) -> ScreenVisualProperties:
-        try:
-            screen_properties = ScreenVisualProperties.objects.get(
-                width=width, height=height
-            )
-        except ObjectDoesNotExist:
-            screen_properties = ScreenVisualProperties()
-            screen_properties.width = width
-            screen_properties.height = height
-            screen_properties.save()
-        return screen_properties
+        instance, created = ScreenVisualProperties.objects.get_or_create(
+            width=width, height=height
+        )
+        return instance
 
     def add_flow(
         self, title: str, description: str, width: int, height: int, author: Profile
@@ -112,14 +106,15 @@ class FlowRepository:
     def add_connection(screen_out: Screen, screen_in: Screen) -> Connection:
         try:
             direct_connection = Connection.objects.get(
-                Q(screen_out=screen_out) & Q(screen_in=screen_in)
+                screen_out=screen_out, screen_in=screen_in
             )
+
         except ObjectDoesNotExist:
             direct_connection = None
 
         try:
             reverse_connection = Connection.objects.get(
-                Q(screen_out=screen_in) & Q(screen_in=screen_out)
+                screen_out=screen_in, screen_in=screen_out
             )
         except ObjectDoesNotExist:
             reverse_connection = None

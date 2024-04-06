@@ -1,19 +1,7 @@
+from django.apps import apps
 from django.contrib import admin
 
-from apps.interface_flows_api.models import (Comment, Connection, Flow, Genre,
-                                             Like, Platform, Profile, Screen,
-                                             ScreenVisualProperties)
+app = apps.get_app_config("interface_flows_api")
 
-admin.site.register(
-    [
-        Profile,
-        Flow,
-        Screen,
-        Connection,
-        Comment,
-        Like,
-        Genre,
-        Platform,
-        ScreenVisualProperties,
-    ]
-)
+for model_name, model in app.models.items():
+    admin.site.register(model)

@@ -2,6 +2,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.generics import *
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -16,7 +17,13 @@ from apps.interface_flows_api.services.flow_service import flow_service
 
 
 class FlowView(APIView):
+    class FlowsPagination(PageNumberPagination):
+        page_size = 1
+        page_size_query_param = "page_size"
+        max_page_size = 1
+
     service = flow_service
+    pagination_class = FlowsPagination
 
     def get_permissions(self):
         if self.request.method == "POST":
@@ -28,16 +35,19 @@ class FlowView(APIView):
 
     def get(self, request, *args, **kwargs):
         sort_param = request.query_params.get("sort", "date")
-        order_param = request.query_params.get("order", "DESC")
-        limit_param = int(request.query_params.get("limit", 10))
-        offset_param = int(request.query_params.get("offset", 0))
+        order_param = request.query_params.get("order", "desc")
         genres = request.query_params.getlist("genre")
         platforms = request.query_params.getlist("platform")
         flows = self.service.get_public_flows(
-            sort_param, order_param, limit_param, offset_param, genres, platforms
+            sort_param, order_param, genres, platforms
         )
+        paginator = self.pagination_class()
+        page = paginator.paginate_queryset(flows, request, view=self)
+        if page is not None:
+            serializer = FlowSimpleSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
         serializer = FlowSimpleSerializer(flows, many=True)
-        return Response(serializer.data)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
         user = request.user

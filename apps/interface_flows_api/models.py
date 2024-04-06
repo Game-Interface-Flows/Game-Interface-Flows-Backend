@@ -3,6 +3,7 @@ from django.db import models
 from django.db.models import (BooleanField, CharField, DateField, ForeignKey,
                               ImageField, IntegerField, ManyToManyField, Model,
                               OneToOneField, TextChoices, TextField)
+from django.utils.translation import gettext_lazy as _
 
 import apps.interface_flows_api.config as config
 
@@ -15,6 +16,9 @@ class Profile(Model):
         upload_to=config.AWS_FOLDER_PROFILES,
         default=f"{config.AWS_FOLDER_PROFILES}/{config.DEFAULT_PROFILE_PIC}",
     )
+
+    def __str__(self):
+        return self.user.username
 
 
 class Platform(Model):
@@ -40,13 +44,13 @@ class Genre(Model):
 
 
 class FlowStatus(TextChoices):
-    VERIFIED = ("VR",)
-    ON_MODERATION = "MD"
+    VERIFIED = "VR", _("Verified")
+    ON_MODERATION = "MD", _("Moderation")
 
 
 class FlowVisibility(TextChoices):
-    PUBLIC = ("PB",)
-    PRIVATE = "PV"
+    PUBLIC = "PB", _("Public")
+    PRIVATE = "PV", _("Private")
 
 
 class ScreenVisualProperties(Model):
@@ -58,6 +62,9 @@ class ScreenVisualProperties(Model):
             "width",
             "height",
         )
+
+    def __str__(self):
+        return f"{self.width}x{self.height}"
 
     @property
     def offset_x(self):
@@ -82,7 +89,7 @@ class Flow(Model):
         max_length=2, choices=FlowVisibility.choices, default=FlowVisibility.PUBLIC
     )
     author = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=False, related_name="flows"
+        Profile, on_delete=models.CASCADE, null=False, related_name="user_flows"
     )
     date = DateField(auto_now=False, auto_now_add=True)
     flow_thumbnail_url = ImageField(
@@ -96,7 +103,7 @@ class Flow(Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="flows",
+        related_name="flows_visual_properties",
     )
 
     @property
@@ -132,10 +139,10 @@ class Screen(Model):
 
 
 class Anchors(TextChoices):
-    LEFT = ("left",)
-    RIGHT = ("right",)
-    TOP = ("top",)
-    BOTTOM = ("bottom",)
+    LEFT = "left"
+    RIGHT = "right"
+    TOP = "top"
+    BOTTOM = "bottom"
 
 
 class Connection(Model):
@@ -148,12 +155,24 @@ class Connection(Model):
     )
 
     @property
-    def target_anchor(self):
-        return Anchors.TOP
+    def source_anchor(self) -> Anchors:
+        """Source anchor should be on right or bottom side."""
+        if (
+            self.screen_out.position_y < self.screen_in.position_y
+            and self.screen_out.position_x >= self.screen_in.position_x
+        ):
+            return Anchors.BOTTOM
+        return Anchors.RIGHT
 
     @property
-    def source_anchor(self):
-        return Anchors.TOP
+    def target_anchor(self) -> Anchors:
+        """Target anchor should be on top or left side."""
+        if (
+            self.screen_in.position_y > self.screen_out.position_y
+            and self.screen_in.position_x <= self.screen_out.position_x
+        ):
+            return Anchors.TOP
+        return Anchors.LEFT
 
     class Meta:
         unique_together = (
