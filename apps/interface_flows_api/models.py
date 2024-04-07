@@ -14,7 +14,7 @@ class Profile(Model):
     )
     profile_photo_url = ImageField(
         upload_to=config.AWS_FOLDER_PROFILES,
-        default=f"{config.AWS_FOLDER_PROFILES}/{config.DEFAULT_PROFILE_PIC}",
+        default=f"{config.AWS_FOLDER_PROFILES}/{config.DEFAULT_PROFILE}",
     )
 
     def __str__(self):
@@ -68,18 +68,20 @@ class ScreenVisualProperties(Model):
 
     @property
     def offset_x(self):
+        width_ratio = 0.1
         width = self.width.value_to_string(self)
-        return round(int(width) * config.WIDTH_RATIO)
+        return round(int(width) * width_ratio)
 
     @property
     def offset_y(self):
+        height_ratio = 0.05
         height = self.height.value_to_string(self)
-        return round(int(height) * config.HEIGHT_RATIO)
+        return round(int(height) * height_ratio)
 
 
 class Flow(Model):
     title = TextField()
-    description = TextField()
+    description = TextField(null=True, blank=True)
     status = CharField(
         max_length=2,
         choices=FlowStatus.choices,
@@ -94,7 +96,7 @@ class Flow(Model):
     date = DateField(auto_now=False, auto_now_add=True)
     flow_thumbnail_url = ImageField(
         upload_to=config.AWS_FOLDER_THUMBNAILS,
-        default=f"{config.AWS_FOLDER_THUMBNAILS}/{config.DEFAULT_FLOW_THUMBNAIL}",
+        default=f"{config.AWS_FOLDER_THUMBNAILS}/{config.DEFAULT_THUMBNAIL}",
     )
     genres = ManyToManyField(Genre, related_name="genres", blank=True)
     platforms = ManyToManyField(Platform, related_name="platforms", blank=True)
@@ -110,15 +112,8 @@ class Flow(Model):
     def total_likes(self) -> int:
         return len(Like.objects.filter(flow=self))
 
-    @property
-    def is_public_and_verified(self):
-        return (
-            self.visibility == FlowVisibility.PUBLIC
-            and self.status == FlowStatus.VERIFIED
-        )
-
     def __str__(self):
-        return self.title
+        return f"{self.title} ({self.id})"
 
 
 class Screen(Model):
@@ -126,7 +121,10 @@ class Screen(Model):
         Flow, on_delete=models.CASCADE, null=False, related_name="screens"
     )
     flow_screen_number = IntegerField()
-    image = ImageField(upload_to=config.AWS_FOLDER_SCREENS)
+    image = ImageField(
+        upload_to=config.AWS_FOLDER_SCREENS,
+        default=f"{config.AWS_FOLDER_SCREENS}/{config.DEFAULT_SCREEN}",
+    )
     position_x = IntegerField(default=0)
     position_y = IntegerField(default=0)
 
@@ -183,20 +181,20 @@ class Connection(Model):
 
 class Comment(Model):
     author = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=False, related_name="user_comments"
+        Profile, on_delete=models.CASCADE, null=False, related_name="comments"
     )
     flow = ForeignKey(
-        Flow, on_delete=models.CASCADE, null=False, related_name="flow_comments"
+        Flow, on_delete=models.CASCADE, null=False, related_name="commented_by"
     )
     text = TextField(max_length=240)
 
 
 class Like(Model):
     user = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=False, related_name="user_like"
+        Profile, on_delete=models.CASCADE, null=False, related_name="likes"
     )
     flow = ForeignKey(
-        Flow, on_delete=models.CASCADE, null=False, related_name="flow_like"
+        Flow, on_delete=models.CASCADE, null=False, related_name="liked_by"
     )
 
     class Meta:

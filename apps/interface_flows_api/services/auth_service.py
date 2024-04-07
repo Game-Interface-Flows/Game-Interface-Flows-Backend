@@ -1,22 +1,13 @@
-from django.core.exceptions import ObjectDoesNotExist
-
-from apps.interface_flows_api.models import Profile, User
-from apps.interface_flows_api.repositories.user_repository import (
-    UserRepository, user_repository)
+from apps.interface_flows_api.models import User
 
 
 class AuthService:
-    def __init__(self, repository: UserRepository):
-        self.repository = repository
-
-    def create_user(self, username, password, email) -> User:
-        return self.repository.create_new_user(username, password, email)
-
-    def get_profile(self, user) -> Profile:
-        try:
-            return self.repository.get_profile_by_user(user)
-        except ObjectDoesNotExist:
-            raise ObjectDoesNotExist
+    @staticmethod
+    def create_user(username: str, password: str, email: str) -> User:
+        user = User.objects.create_user(username=username, email=email)
+        user.set_password(password)
+        user.save()
+        return user
 
 
-auth_service = AuthService(user_repository)
+auth_service = AuthService()

@@ -1,6 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.exceptions import NotFound, ParseError, PermissionDenied
 from rest_framework.generics import *
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -8,22 +9,28 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.interface_flows_api.exceptions import (
-    MLServicesUnavailableException, PrivateFlowException)
-from apps.interface_flows_api.responses import (NonAuthoritativeResponse,
-                                                NotFoundResponse)
+    MLServicesUnavailableException, MLServiceUnavailable, PrivateFlowException)
+from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.serializers import *
 from apps.interface_flows_api.services.auth_service import auth_service
-from apps.interface_flows_api.services.flow_service import flow_service
+from apps.interface_flows_api.services.flow_build_service import \
+    flow_build_service
+from apps.interface_flows_api.services.flow_social_service import \
+    flow_social_service
 
 
 class FlowView(APIView):
-    class FlowsPagination(PageNumberPagination):
-        page_size = 1
-        page_size_query_param = "page_size"
-        max_page_size = 1
+    """Controller to create a new flow or get list of views."""
 
-    service = flow_service
+    class FlowsPagination(PageNumberPagination):
+        """Simple flows pagination for listing."""
+
+        page_size = 5
+        page_size_query_param = "page_size"
+        max_page_size = 5
+
     pagination_class = FlowsPagination
+    object_name = "flow"
 
     def get_permissions(self):
         if self.request.method == "POST":
@@ -36,11 +43,13 @@ class FlowView(APIView):
     def get(self, request, *args, **kwargs):
         sort_param = request.query_params.get("sort", "date")
         order_param = request.query_params.get("order", "desc")
-        genres = request.query_params.getlist("genre")
-        platforms = request.query_params.getlist("platform")
-        flows = self.service.get_public_flows(
+        genres = request.query_params.getlist("genre", None)
+        platforms = request.query_params.getlist("platform", None)
+
+        flows = flow_selector.get_public_flows(
             sort_param, order_param, genres, platforms
         )
+
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(flows, request, view=self)
         if page is not None:
@@ -51,110 +60,141 @@ class FlowView(APIView):
 
     def post(self, request, *args, **kwargs):
         user = request.user
+
         frames = request.FILES.getlist("frames")
-        flow_title = request.data["title"]
-        flow_description = request.data["description"]
-        if frames is None:
-            return Response()
+        if len(frames) == 0:
+            raise ParseError(detail="Frames are required to create a flow.", code=400)
+
+        data = request.data.copy()
+        serializer = FlowSimpleSerializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
         try:
-            flow = self.service.create_new_flow(
-                frames=frames, user=user, title=flow_title, description=flow_description
+            flow = flow_build_service.create_new_flow(
+                **serializer.validated_data, frames=frames, user=user
             )
             serializer = FlowSerializer(flow)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except MLServicesUnavailableException as e:
-            return Response(
-                {"error": "Failed to create flow.", "message": str(e)},
-                status=status.HTTP_503_SERVICE_UNAVAILABLE,
-            )
-        except Exception as e:
-            return Response(
-                {"error": "Failed to create flow.", "message": str(e)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        except MLServicesUnavailableException:
+            raise MLServiceUnavailable()
 
 
-class FlowDetailView(RetrieveAPIView):
-    serializer_class = FlowSerializer
-    service = flow_service
-    queryset = service.get_public_flows()
-    object_name = "flow"
+class MyFlowView(ListAPIView):
+    """Controller to get flows created by a user."""
 
-    def get(self, request, *args, **kwargs):
-        user = request.user
-        flow_id = self.kwargs["pk"]
-        try:
-            flow = self.service.get_flow_by_id(flow_id=flow_id, user=user)
-            serializer = self.serializer_class(flow)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except ObjectDoesNotExist:
-            return NotFoundResponse(object_name=self.object_name, object_id=flow_id)
-        except PrivateFlowException:
-            return NonAuthoritativeResponse(object_name=self.object_name)
-
-
-class FlowLikeView(CreateAPIView, DestroyAPIView):
+    serializer_class = FlowSimpleSerializer
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    service = flow_service
-    serializer_class = LikeSerializer
-    queryset = Like.objects.all()
 
-    def create(self, request, *args, **kwargs):
-        user = request.user
-        request.data["user"] = auth_service.get_profile(user).id
-        request.data["flow"] = self.kwargs["pk"]
-        return super().create(request, *args, **kwargs)
+    def get_queryset(self):
+        user = self.request.user
+        return flow_selector.get_my_flows(user)
+
+
+class LikedFlowView(ListAPIView):
+    """Controller to get flows liked by a user."""
+
+    serializer_class = FlowSimpleSerializer
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return flow_selector.get_liked_flows(user)
+
+
+class FlowVisibilityMixin:
+    """Mixin to check if a user has rights to view a flow."""
+
+    @staticmethod
+    def get_flow(flow_id, user):
+        try:
+            return flow_selector.get_flow_by_id(flow_id=flow_id, user=user)
+        except ObjectDoesNotExist:
+            raise NotFound(detail=f"Flow with id={flow_id} not found.", code=404)
+        except PrivateFlowException:
+            raise PermissionDenied(detail="Access to the flow is denied.", code=403)
+
+
+class FlowDetailView(RetrieveAPIView, FlowVisibilityMixin):
+    """Controller to retrieve a detailed flow."""
+
+    serializer_class = FlowSerializer
+    queryset = flow_selector.get_public_flows()
 
     def get_object(self):
         user = self.request.user
-        profile_id = auth_service.get_profile(user).id
-        flow_id = self.kwargs["pk"]
-        obj = get_object_or_404(Like, flow=flow_id, user=profile_id)
-        return obj
+        flow = self.get_flow(self.kwargs["pk"], user)
+        return flow
 
 
-class FlowCommentView(CreateAPIView):
+class FlowLikeView(APIView, FlowVisibilityMixin):
+    """Controller to like or dislike a flow."""
+
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    serializer_class = None
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        flow = self.get_flow(self.kwargs["pk"], user)
+        flow_social_service.like_flow(flow=flow, user=user)
+        return Response(status=status.HTTP_201_CREATED)
+
+    def delete(self, request, *args, **kwargs):
+        user = request.user
+        flow = self.get_flow(self.kwargs["pk"], user)
+        try:
+            flow_social_service.like_flow(flow=flow, user=user, like=False)
+        except ObjectDoesNotExist:
+            raise NotFound(detail=f"Like must be set before dislike.", code=404)
+        return Response(status=status.HTTP_200_OK)
+
+
+class FlowCommentView(APIView, FlowVisibilityMixin):
+    """Controller to create a new comment"""
+
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
     serializer_class = CommentSerializer
-    service = flow_service
 
     def post(self, request, *args, **kwargs):
-        flow_id = self.kwargs["pk"]
         user = self.request.user
-        text = request.data["text"]
-        try:
-            comment = self.service.comment_flow(flow_id, user, text)
-            serializer = self.serializer_class(comment)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        except ObjectDoesNotExist:
-            return NotFoundResponse(object_name="flow", object_id=id)
-        except Exception as e:
-            return Response(
-                {"error": "Failed to create comment", "message": str(e)},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+        flow = self.get_flow(self.kwargs["pk"], user)
+
+        data = request.data.copy()
+        data["flow"] = flow.id
+        data["author"] = user.profile
+
+        serializer = self.serializer_class(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        flow_social_service.comment_flow(flow, user, data["text"])
+
+        return Response(status=status.HTTP_201_CREATED)
 
 
 class CreateUserView(CreateAPIView):
+    """Controller to create a new user"""
+
     serializer_class = UserSerializer
-    service = auth_service
 
     def post(self, request, *args, **kwargs):
-        username = request.data["username"]
-        password = request.data["password"]
-        email = request.data["email"]
-        user = self.service.create_user(username, password, email=email)
-        serializer = self.serializer_class(user)
+        serializer = self.serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        auth_service.create_user(**serializer.validated_data)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class GenresView(ListAPIView):
+    """Controller to retrieve all genres"""
+
     queryset = Genre.objects.all()
     serializer_class = GenreSerializer
 
 
 class PlatformsView(ListAPIView):
+    """Controller to retrieve all platforms"""
+
     queryset = Platform.objects.all()
     serializer_class = PlatformSerializer

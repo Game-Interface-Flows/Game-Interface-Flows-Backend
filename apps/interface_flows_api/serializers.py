@@ -18,6 +18,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["username", "password", "email"]
+        extra_kwargs = {"email": {"required": True}}
 
 
 class ConnectionSerializer(ModelSerializer):
@@ -66,7 +67,7 @@ class CommentSerializer(ModelSerializer):
 
 class FlowSimpleSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
-    author = ProfileSerializer(write_only=True)
+    author = ProfileSerializer(write_only=True, required=False)
 
     class Meta:
         model = Flow
@@ -88,7 +89,7 @@ class PlatformSerializer(serializers.ModelSerializer):
 class FlowSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
     screens = ScreenSerializer(read_only=True, many=True)
-    flow_comments = CommentSerializer(read_only=True, many=True)
+    commented_by = CommentSerializer(read_only=True, many=True)
     author = ProfileSerializer(read_only=True)
     genres = GenreSerializer(many=True, read_only=True)
     platforms = PlatformSerializer(many=True, read_only=True)
@@ -97,9 +98,3 @@ class FlowSerializer(ModelSerializer):
     class Meta:
         model = Flow
         exclude = ["flow_thumbnail_url"]
-
-
-class LikeSerializer(ModelSerializer):
-    class Meta:
-        model = Like
-        fields = "__all__"
