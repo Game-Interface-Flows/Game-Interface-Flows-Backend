@@ -36,7 +36,7 @@ class ScreenVisualPropertiesSerializer(ModelSerializer):
 
     class Meta:
         model = ScreenVisualProperties
-        exclude = ["id"]
+        fields = "__all__"
 
 
 class ScreenSerializer(ModelSerializer):

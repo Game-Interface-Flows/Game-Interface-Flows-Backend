@@ -67,15 +67,15 @@ class ScreenVisualProperties(Model):
         return f"{self.width}x{self.height}"
 
     @property
-    def offset_x(self):
+    def offset_x(self) -> int:
         width_ratio = 0.1
-        width = self.width.value_to_string(self)
+        width = self.width
         return round(int(width) * width_ratio)
 
     @property
-    def offset_y(self):
+    def offset_y(self) -> int:
         height_ratio = 0.05
-        height = self.height.value_to_string(self)
+        height = self.height
         return round(int(height) * height_ratio)
 
 
