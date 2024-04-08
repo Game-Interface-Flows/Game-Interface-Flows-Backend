@@ -21,7 +21,7 @@ class FlowsTests(APITestCase):
                     "genre_icon_url": "http://storage.yandexcloud.net/game-interface-flows/icons/icon.png",
                 },
                 {
-                    "id": 1,
+                    "id": 2,
                     "name": "genre_test_2",
                     "genre_icon_url": "http://storage.yandexcloud.net/game-interface-flows/icons/icon.png",
                 },
