@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from django.core.exceptions import ObjectDoesNotExist
 
 from apps.interface_flows_api.models import Comment, Flow, Like, User
