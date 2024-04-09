@@ -10,6 +10,9 @@ pretty:
 	black .
 	isort .
 
+test:
+	python manage.py test
+
 superuser:
 	python manage.py createsuperuser
 

@@ -12,6 +12,6 @@ urlpatterns = [
     path("flows/<int:pk>/", FlowDetailView.as_view(), name="flow"),
     path("flows/<int:pk>/likes/", FlowLikeView.as_view(), name="likes"),
     path("flows/<int:pk>/comments/", FlowCommentView.as_view(), name="comments"),
-    path("auth/signup/", CreateUserView.as_view(), name="registration"),
+    path("auth/signup/", CreateUserView.as_view(), name="signup"),
     path("auth/token/", ObtainAuthToken.as_view(), name="login"),
 ]
