@@ -60,7 +60,7 @@ class FlowBuildService:
 
         return Connection.objects.create(screen_out=screen_out, screen_in=screen_in)
 
-    def _build_graph(
+    def _compute_screen_position(
         self, visited: set, graph: dict, node: Screen, x: int, y: int
     ) -> int | None:
         if node not in visited:
@@ -70,7 +70,7 @@ class FlowBuildService:
             for neighbour in graph[node]:
                 next_x = x + 1
                 next_y = y + 1 if i > 0 else y
-                dy = self._build_graph(visited, graph, neighbour, next_x, next_y)
+                dy = self._compute_screen_position(visited, graph, neighbour, next_x, next_y)
                 if dy is None:
                     continue
                 y = dy
@@ -79,21 +79,17 @@ class FlowBuildService:
             return y
         return None
 
-    def _compute_flow_screens_positions(self, flow: Flow) -> Iterable[Screen]:
+    def _build_graph(self, flow: Flow) -> Iterable[Screen]:
         screens = Screen.objects.filter(flow=flow)
         graph = {}
-
         for screen in screens:
             graph[screen] = flow_selector.get_connected_screens(screen)
-
         visited = set()
         y = 0
-
         while len(graph) != 0:
             current_node = max(graph, key=lambda x: len(graph[x]))
-            y = self._build_graph(visited, graph, current_node, 0, y)
+            y = self._compute_screen_position(visited, graph, current_node, 0, y)
             y += 1
-
         return screens
 
     def create_new_flow(
@@ -140,7 +136,7 @@ class FlowBuildService:
 
             previous_screen = screen
 
-        self._compute_flow_screens_positions(flow)
+        self._build_graph(flow)
 
         return flow
 
