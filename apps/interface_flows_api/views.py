@@ -9,14 +9,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.interface_flows_api.exceptions import (
-    MLServicesUnavailableException, MLServiceUnavailable, PrivateFlowException)
+    MLServicesUnavailableException,
+    MLServiceUnavailable,
+    PrivateFlowException,
+    UnverifiedFlowExistsException,
+    UnverifiedFlowExists,
+)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.serializers import *
 from apps.interface_flows_api.services.auth_service import auth_service
-from apps.interface_flows_api.services.flow_build_service import \
-    flow_build_service
-from apps.interface_flows_api.services.flow_social_service import \
-    flow_social_service
+from apps.interface_flows_api.services.flow_build_service import flow_build_service
+from apps.interface_flows_api.services.flow_social_service import flow_social_service
 
 
 class FlowView(APIView):
@@ -75,6 +78,8 @@ class FlowView(APIView):
             )
             serializer = FlowSerializer(flow)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except UnverifiedFlowExistsException:
+            raise UnverifiedFlowExists()
         except MLServicesUnavailableException:
             raise MLServiceUnavailable()
 

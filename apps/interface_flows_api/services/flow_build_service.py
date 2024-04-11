@@ -5,9 +5,17 @@ from typing import Iterable, List
 from django.core.exceptions import ObjectDoesNotExist
 from PIL import Image
 
-from apps.interface_flows_api.exceptions import MLServicesUnavailableException
-from apps.interface_flows_api.models import (Connection, Flow, Screen,
-                                             ScreenVisualProperties, User)
+from apps.interface_flows_api.exceptions import (
+    MLServicesUnavailableException,
+    UnverifiedFlowExistsException,
+)
+from apps.interface_flows_api.models import (
+    Connection,
+    Flow,
+    Screen,
+    ScreenVisualProperties,
+    User,
+)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
 
@@ -70,7 +78,9 @@ class FlowBuildService:
             for neighbour in graph[node]:
                 next_x = x + 1
                 next_y = y + 1 if i > 0 else y
-                dy = self._compute_screen_position(visited, graph, neighbour, next_x, next_y)
+                dy = self._compute_screen_position(
+                    visited, graph, neighbour, next_x, next_y
+                )
                 if dy is None:
                     continue
                 y = dy
@@ -95,6 +105,9 @@ class FlowBuildService:
     def create_new_flow(
         self, title: str, frames: List[bytes], user: User, description: str = None
     ) -> Flow:
+        if flow_selector.if_user_reach_unverified_flows_limit(user):
+            raise UnverifiedFlowExistsException
+
         try:
             predictions = ml_service_provider.get_direct_graph(frames)
         except MLServicesUnavailableException:

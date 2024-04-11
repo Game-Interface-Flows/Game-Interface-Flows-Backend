@@ -4,14 +4,22 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
 
 from apps.interface_flows_api.exceptions import PrivateFlowException
-from apps.interface_flows_api.models import (Connection, Flow, FlowStatus,
-                                             FlowVisibility, Genre, Platform,
-                                             Screen)
+from apps.interface_flows_api.models import (
+    Connection,
+    Flow,
+    FlowStatus,
+    FlowVisibility,
+    Genre,
+    Platform,
+    Screen,
+)
 from apps.interface_flows_api.selectors.selector import Selector
 
 
 class FlowSelector(Selector):
     """Flow Selector is designed for read-only operations."""
+
+    flows_on_verify_limit = 1
 
     @staticmethod
     def get_genres_by_names(names: List[str] = None) -> Iterable[Genre]:
@@ -45,6 +53,12 @@ class FlowSelector(Selector):
     @staticmethod
     def get_liked_flows(user: User) -> Iterable[Flow]:
         return Flow.objects.filter(liked_by__user=user.profile)
+
+    def if_user_reach_unverified_flows_limit(self, user: User) -> bool:
+        flows = Flow.objects.filter(
+            author=user.profile, status=FlowStatus.ON_MODERATION
+        )
+        return True if len(flows) >= self.flows_on_verify_limit else False
 
     def get_public_flows(
         self,
