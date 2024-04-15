@@ -24,12 +24,16 @@ class FlowBuildService:
         return width, height
 
     @staticmethod
-    def _add_screen(flow: Flow, number: int, image: InMemoryUploadedFile) -> Screen:
-        flow_num = "{:02d}".format(len(flow_selector.get_flows_by_title(flow.title)))
-        formatted_numer = "{:02d}".format(number)
+    def _add_screen(flow: Flow, image: InMemoryUploadedFile) -> Screen:
+        flow_num = len(flow_selector.get_flows_by_title(flow.title))
+        f_flow_num = "{:02d}".format(flow_num)
+        screen_num = len(flow_selector.get_flow_screens(flow)) + 1
+        f_screen_num = "{:02d}".format(screen_num)
         ext = image.name.split(".")[-1]
-        image.name = f"{flow.title}_{flow_num}_{formatted_numer}.{ext}"
-        return Screen.objects.create(flow=flow, flow_screen_number=number, image=image)
+        image.name = f"{flow.title}_{f_flow_num}_{f_screen_num}.{ext}"
+        return Screen.objects.create(
+            flow=flow, flow_screen_number=screen_num, image=image
+        )
 
     @staticmethod
     def _update_flow_screen_pos(screen: Screen, x: int, y: int) -> None:
@@ -88,7 +92,7 @@ class FlowBuildService:
         return None
 
     def _build_graph(self, flow: Flow) -> Iterable[Screen]:
-        screens = Screen.objects.filter(flow=flow)
+        screens = flow_selector.get_flow_screens(flow)
         graph = {}
         for screen in screens:
             graph[screen] = flow_selector.get_connected_screens(screen)
@@ -129,7 +133,6 @@ class FlowBuildService:
                 screen = self._add_screen(
                     flow=flow,
                     image=frames[prediction["index"]],
-                    number=prediction["index"],
                 )
                 seen_screens_indices.add(prediction["index"])
             else:

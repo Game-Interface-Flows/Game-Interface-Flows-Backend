@@ -52,6 +52,10 @@ class FlowSelector(Selector):
     def get_flows_by_title(title: str) -> Iterable[Flow]:
         return Flow.objects.filter(title=title)
 
+    @staticmethod
+    def get_flow_screens(flow: Flow) -> Iterable[Screen]:
+        return Screen.objects.filter(flow=flow)
+
     def if_user_reach_unverified_flows_limit(self, user: User) -> bool:
         flows = Flow.objects.filter(
             author=user.profile, status=FlowStatus.ON_MODERATION
