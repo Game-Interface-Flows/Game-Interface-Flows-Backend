@@ -1,18 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
-from django.db.models import (
-    BooleanField,
-    CharField,
-    DateField,
-    ForeignKey,
-    ImageField,
-    IntegerField,
-    ManyToManyField,
-    Model,
-    OneToOneField,
-    TextChoices,
-    TextField,
-)
+from django.db.models import (BooleanField, CharField, DateField, ForeignKey,
+                              ImageField, IntegerField, ManyToManyField, Model,
+                              OneToOneField, TextChoices, TextField)
 from django.utils.translation import gettext_lazy as _
 
 import apps.interface_flows_api.config as config

@@ -3,19 +3,13 @@ from __future__ import annotations
 from typing import Iterable, List
 
 from django.core.exceptions import ObjectDoesNotExist
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image
 
 from apps.interface_flows_api.exceptions import (
-    MLServicesUnavailableException,
-    UnverifiedFlowExistsException,
-)
-from apps.interface_flows_api.models import (
-    Connection,
-    Flow,
-    Screen,
-    ScreenVisualProperties,
-    User,
-)
+    MLServicesUnavailableException, UnverifiedFlowExistsException)
+from apps.interface_flows_api.models import (Connection, Flow, Screen,
+                                             ScreenVisualProperties, User)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
 
@@ -30,7 +24,11 @@ class FlowBuildService:
         return width, height
 
     @staticmethod
-    def _add_screen(flow: Flow, number: int, image) -> Screen:
+    def _add_screen(flow: Flow, number: int, image: InMemoryUploadedFile) -> Screen:
+        flow_num = "{:02d}".format(len(flow_selector.get_flows_by_title(flow.title)))
+        formatted_numer = "{:02d}".format(number)
+        ext = image.name.split(".")[-1]
+        image.name = f"{flow.title}_{flow_num}_{formatted_numer}.{ext}"
         return Screen.objects.create(flow=flow, flow_screen_number=number, image=image)
 
     @staticmethod
