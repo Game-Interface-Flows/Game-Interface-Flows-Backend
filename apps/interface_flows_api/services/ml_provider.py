@@ -12,13 +12,19 @@ class MachineLearningServiceProvider:
     def __init__(self, host: str, port: str):
         self.ml_service_url = f"{host}:{port}"
 
-    def get_direct_graph(self, images: List[TemporaryUploadedFile]) -> json:
+    def get_direct_graph(
+        self, images: List[TemporaryUploadedFile], images_interval: int = 1
+    ) -> json:
         images = [
             ("images", (file.name, file.open().read(), file.content_type))
             for file in images
         ]
         try:
-            response = requests.post(f"{self.ml_service_url}/flow", files=images)
+            response = requests.post(
+                f"{self.ml_service_url}/flow",
+                files=images,
+                json={images_interval: images_interval},
+            )
             flow_graph = response.json()
             return flow_graph
         except requests.exceptions.RequestException as e:
