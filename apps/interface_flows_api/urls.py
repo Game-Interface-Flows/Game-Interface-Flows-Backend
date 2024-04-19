@@ -5,7 +5,7 @@ from apps.interface_flows_api.views import *
 
 urlpatterns = [
     path("genres/", GenresView.as_view(), name="genres"),
-    path("platforms", PlatformsView.as_view(), name="platforms"),
+    path("platforms/", PlatformsView.as_view(), name="platforms"),
     path("flows/", FlowView.as_view(), name="flows"),
     path("flows/liked/", LikedFlowView.as_view(), name="liked_flows"),
     path("flows/my/", MyFlowView.as_view(), name="my_flows"),

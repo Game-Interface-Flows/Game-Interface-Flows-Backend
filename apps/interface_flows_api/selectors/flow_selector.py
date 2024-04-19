@@ -1,13 +1,16 @@
-from typing import Iterable, List
+from typing import Iterable, List, Type
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ObjectDoesNotExist
+from django.db.models import Model
 
 from apps.interface_flows_api.exceptions import PrivateFlowException
 from apps.interface_flows_api.models import (Connection, Flow, FlowStatus,
                                              FlowVisibility, Genre, Platform,
                                              Screen)
-from apps.interface_flows_api.selectors.selector import Selector
+from apps.interface_flows_api.selectors.selector import (SelectionOption,
+                                                         Selector,
+                                                         model_binder)
 
 
 class FlowSelector(Selector):
@@ -15,17 +18,23 @@ class FlowSelector(Selector):
 
     flows_on_verify_limit = 100
 
-    @staticmethod
-    def get_genres_by_names(names: List[str] = None) -> Iterable[Genre]:
-        if names is None or len(names) == 0:
-            return Genre.objects.all()
-        return Genre.objects.filter(name__in=names)
+    @model_binder(Genre)
+    def get_genres_by_names(
+        self,
+        model: Type[Model],
+        names: List[str] = None,
+        option: SelectionOption = SelectionOption.all,
+    ) -> Iterable[Genre]:
+        return self.get_items_by_names(model, names, option)
 
-    @staticmethod
-    def get_platforms_by_names(names: List[str] = None) -> Iterable[Platform]:
-        if names is None or len(names) == 0:
-            return Platform.objects.all()
-        return Platform.objects.filter(name__in=names)
+    @model_binder(Platform)
+    def get_platforms_by_names(
+        self,
+        model: Type,
+        names: List[str] = None,
+        option: SelectionOption = SelectionOption.all,
+    ) -> Iterable[Platform]:
+        return self.get_items_by_names(model, names, option)
 
     @staticmethod
     def get_flow_by_id(flow_id: int, user: User = None) -> Flow:

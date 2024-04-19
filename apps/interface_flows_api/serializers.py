@@ -68,10 +68,19 @@ class CommentSerializer(ModelSerializer):
 class FlowSimpleSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
     author = ProfileSerializer(write_only=True, required=False)
+    description = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = Flow
-        fields = ["id", "title", "date", "total_likes", "flow_thumbnail_url", "author"]
+        fields = [
+            "id",
+            "title",
+            "description",
+            "date",
+            "total_likes",
+            "flow_thumbnail_url",
+            "author",
+        ]
 
 
 class GenreSerializer(serializers.ModelSerializer):

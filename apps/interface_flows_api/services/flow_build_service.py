@@ -8,9 +8,11 @@ from PIL import Image
 
 from apps.interface_flows_api.exceptions import (
     MLServicesUnavailableException, UnverifiedFlowExistsException)
-from apps.interface_flows_api.models import (Connection, Flow, Screen,
-                                             ScreenVisualProperties, User)
+from apps.interface_flows_api.models import (Connection, Flow, Genre, Platform,
+                                             Screen, ScreenVisualProperties,
+                                             User)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
+from apps.interface_flows_api.selectors.selector import SelectionOption
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
 
 
@@ -105,13 +107,23 @@ class FlowBuildService:
         return screens
 
     def create_new_flow(
-        self, title: str, frames: List[bytes], user: User, description: str = None
+        self,
+        title: str,
+        frames: List[bytes],
+        user: User,
+        flow_thumbnail_url: InMemoryUploadedFile = None,
+        description: str = None,
+        interval: int = 1,
+        platforms: List[Platform] = None,
+        genres: List[Genre] = None,
     ) -> Flow:
         if flow_selector.if_user_reach_unverified_flows_limit(user):
             raise UnverifiedFlowExistsException
 
         try:
-            predictions = ml_service_provider.get_direct_graph(frames)
+            predictions = ml_service_provider.get_direct_graph(
+                frames, images_interval=interval
+            )
         except MLServicesUnavailableException:
             raise MLServicesUnavailableException
 
@@ -124,6 +136,20 @@ class FlowBuildService:
             description=description,
             screens_properties=screens_properties,
         )
+
+        platforms = flow_selector.get_platforms_by_names(
+            names=platforms, option=SelectionOption.nothing
+        )
+        flow.platforms.set(platforms)
+
+        genres = flow_selector.get_genres_by_names(
+            names=genres, option=SelectionOption.nothing
+        )
+        flow.genres.set(genres)
+
+        if flow_thumbnail_url is not None:
+            flow.flow_thumbnail_url = flow_thumbnail_url
+            flow.save()
 
         previous_screen = None
         seen_screens_indices = set()

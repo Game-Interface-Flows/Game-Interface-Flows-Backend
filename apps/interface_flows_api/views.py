@@ -63,8 +63,13 @@ class FlowView(APIView):
         user = request.user
 
         frames = request.FILES.getlist("frames")
+
         if len(frames) == 0:
             raise ParseError(detail="Frames are required to create a flow.", code=400)
+
+        interval = request.data.get("interval", 1)
+        platforms = request.data.getlist("platforms", None)
+        genres = request.data.getlist("genres", None)
 
         data = request.data.copy()
         serializer = FlowSimpleSerializer(data=data)
@@ -72,7 +77,12 @@ class FlowView(APIView):
 
         try:
             flow = flow_build_service.create_new_flow(
-                **serializer.validated_data, frames=frames, user=user
+                **serializer.validated_data,
+                frames=frames,
+                user=user,
+                interval=interval,
+                platforms=platforms,
+                genres=genres,
             )
             serializer = FlowSerializer(flow)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
