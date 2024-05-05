@@ -65,24 +65,6 @@ class CommentSerializer(ModelSerializer):
         fields = "__all__"
 
 
-class FlowSimpleSerializer(ModelSerializer):
-    total_likes = serializers.ReadOnlyField()
-    author = ProfileSerializer(write_only=True, required=False)
-    description = serializers.CharField(write_only=True, required=False)
-
-    class Meta:
-        model = Flow
-        fields = [
-            "id",
-            "title",
-            "description",
-            "date",
-            "total_likes",
-            "flow_thumbnail_url",
-            "author",
-        ]
-
-
 class GenreSerializer(serializers.ModelSerializer):
     class Meta:
         model = Genre
@@ -95,10 +77,38 @@ class PlatformSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
+class FlowSimpleSerializer(ModelSerializer):
+    total_likes = serializers.ReadOnlyField()
+    author = ProfileSerializer(write_only=True, required=False)
+    description = serializers.CharField(write_only=True, required=False)
+    is_liked = serializers.SerializerMethodField()
+    genres = GenreSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Flow
+        fields = [
+            "id",
+            "title",
+            "description",
+            "date",
+            "total_likes",
+            "flow_thumbnail_url",
+            "author",
+            "genres",
+            "is_liked",
+        ]
+
+    def get_is_liked(self, obj):
+        user = self.context.get("request").user
+        if user.is_authenticated:
+            return obj.likes.filter(user=user.profile).exists()
+        return False
+
+
 class FlowSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
     screens = ScreenSerializer(read_only=True, many=True)
-    commented_by = CommentSerializer(read_only=True, many=True)
+    comments = CommentSerializer(read_only=True, many=True)
     author = ProfileSerializer(read_only=True)
     genres = GenreSerializer(many=True, read_only=True)
     platforms = PlatformSerializer(many=True, read_only=True)
@@ -107,3 +117,11 @@ class FlowSerializer(ModelSerializer):
     class Meta:
         model = Flow
         exclude = ["flow_thumbnail_url"]
+
+
+class LikesSerializer(ModelSerializer):
+    total_likes = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Flow
+        fields = ["total_likes"]

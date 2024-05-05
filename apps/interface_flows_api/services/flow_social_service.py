@@ -11,15 +11,17 @@ class FlowSocialService:
         return Comment.objects.create(flow=flow, author=user.profile, text=text)
 
     @staticmethod
-    def like_flow(flow: Flow, user: User, like: bool = True) -> Like | None:
+    def like_flow(flow: Flow, user: User, like: bool = True) -> Flow:
         if like:
-            return Like.objects.get_or_create(flow=flow, user=user.profile)
+            Like.objects.get_or_create(flow=flow, user=user.profile)
+        else:
+            try:
+                like = Like.objects.get(flow=flow, user=user.profile)
+                like.delete()
+            except ObjectDoesNotExist:
+                raise ObjectDoesNotExist
 
-        try:
-            like = Like.objects.get(flow=flow, user=user.profile)
-            like.delete()
-        except ObjectDoesNotExist:
-            raise ObjectDoesNotExist
+        return flow
 
 
 flow_social_service = FlowSocialService()
