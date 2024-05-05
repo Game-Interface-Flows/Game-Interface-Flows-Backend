@@ -181,21 +181,19 @@ class Connection(Model):
 
 class Comment(Model):
     author = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=False, related_name="comments"
+        Profile, on_delete=models.CASCADE, null=False, related_name="commented"
     )
     flow = ForeignKey(
-        Flow, on_delete=models.CASCADE, null=False, related_name="commented_by"
+        Flow, on_delete=models.CASCADE, null=False, related_name="comments"
     )
     text = TextField(max_length=240)
 
 
 class Like(Model):
     user = ForeignKey(
-        Profile, on_delete=models.CASCADE, null=False, related_name="likes"
+        Profile, on_delete=models.CASCADE, null=False, related_name="liked"
     )
-    flow = ForeignKey(
-        Flow, on_delete=models.CASCADE, null=False, related_name="liked_by"
-    )
+    flow = ForeignKey(Flow, on_delete=models.CASCADE, null=False, related_name="likes")
 
     class Meta:
         unique_together = (
