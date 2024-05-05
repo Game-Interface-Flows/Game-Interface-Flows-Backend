@@ -88,10 +88,10 @@ class FlowSelector(Selector):
         )
         if genres:
             genres = self.get_genres_by_names(genres)
-            flows = flows.filter(genres__in=genres)
+            flows = flows.filter(genres__in=genres).distinct()
         if platforms:
             platforms = self.get_platforms_by_names(platforms)
-            flows = flows.filter(platforms__in=platforms)
+            flows = flows.filter(platforms__in=platforms).distinct()
         order_option = self.get_order_option(sort, order)
         return flows.order_by(order_option)
 
