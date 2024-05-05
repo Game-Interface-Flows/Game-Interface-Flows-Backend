@@ -19,8 +19,14 @@ class PrivateFlowException(Exception):
     pass
 
 
+class VideoProcessingException(Exception):
+    """ "Exception is raised when problem with video processing happens."""
+
+    pass
+
+
 class UnverifiedFlowExists(APIException):
-    """Exception for flows limit."""
+    """Response for flows limit exception."""
 
     status_code = 403
     default_detail = (
@@ -31,8 +37,16 @@ class UnverifiedFlowExists(APIException):
 
 
 class MLServiceUnavailable(APIException):
-    """Exception for ML service."""
+    """Response for ML service exception."""
 
     status_code = 503
     default_detail = "ML Service temporarily unavailable, try again later."
     default_code = "service_unavailable"
+
+
+class VideoProcessing(APIException):
+    """Response for video processing exception."""
+
+    status_code = 500
+    default_detail = "..."
+    default_code = "server_problem"
