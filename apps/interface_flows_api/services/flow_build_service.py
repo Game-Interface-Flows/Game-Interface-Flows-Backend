@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import tempfile
-from io import BytesIO
 from typing import Iterable, List
 
 import cv2
@@ -9,7 +8,6 @@ import numpy as np
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
 from django.core.files.uploadedfile import InMemoryUploadedFile
-from PIL import Image
 
 from apps.interface_flows_api.exceptions import (
     MLServicesException, MLServicesUnavailableException,
@@ -20,6 +18,7 @@ from apps.interface_flows_api.models import (Connection, Flow, Genre, Platform,
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.selectors.selector import SelectionOption
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
+from apps.interface_flows_api.utils.encoder import numpy_array_to_io
 
 
 class FlowBuildService:
@@ -58,16 +57,13 @@ class FlowBuildService:
         return width, height
 
     @staticmethod
-    def _np_to_image(image_np, image_format="JPEG", image_title="default"):
-        # convert from BGR to RGB
-        image_np = image_np[:, :, ::-1]
-        # create a file from correct array
-        image = Image.fromarray(image_np.astype("uint8"))
-        img_io = BytesIO()
-        image.save(img_io, format=image_format)
-        img_io.seek(0)
+    def _np_to_image(
+        image_np: np.array, image_format: str = "JPEG", image_title: str = "default"
+    ) -> ContentFile:
+        buffered = numpy_array_to_io(image_np)
+        buffered.seek(0)
         image_name = f"{image_title}.{image_format.lower()}"
-        return ContentFile(img_io.read(), name=image_name)
+        return ContentFile(buffered.read(), name=image_name)
 
     @staticmethod
     def _update_flow_screen_pos(screen: Screen, x: int, y: int) -> None:
@@ -200,8 +196,6 @@ class FlowBuildService:
 
         previous_screen = None
         seen_screens_indices = set()
-
-        print(predictions)
 
         for i, prediction in enumerate(predictions):
             if prediction.index not in seen_screens_indices:
