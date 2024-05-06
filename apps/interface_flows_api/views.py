@@ -10,7 +10,8 @@ from rest_framework.views import APIView
 
 from apps.interface_flows_api.exceptions import (
     MLServicesUnavailableException, MLServiceUnavailable, PrivateFlowException,
-    UnverifiedFlowExists, UnverifiedFlowExistsException)
+    UnverifiedFlowExists, UnverifiedFlowExistsException, VideoProcessing,
+    VideoProcessingException)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.serializers import *
 from apps.interface_flows_api.services.auth_service import auth_service
@@ -26,9 +27,9 @@ class FlowView(APIView):
     class FlowsPagination(PageNumberPagination):
         """Simple flows pagination for listing."""
 
-        page_size = 5
+        page_size = 10
         page_size_query_param = "page_size"
-        max_page_size = 5
+        max_page_size = 10
 
     pagination_class = FlowsPagination
     object_name = "flow"
@@ -54,25 +55,40 @@ class FlowView(APIView):
         paginator = self.pagination_class()
         page = paginator.paginate_queryset(flows, request, view=self)
         if page is not None:
-            serializer = FlowSimpleSerializer(page, many=True)
+            serializer = FlowSimpleSerializer(
+                page, many=True, context={"request": self.request}
+            )
             return paginator.get_paginated_response(serializer.data)
-        serializer = FlowSimpleSerializer(flows, many=True)
+        serializer = FlowSimpleSerializer(
+            flows, many=True, context={"request": self.request}
+        )
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def post(self, request, *args, **kwargs):
+        # check video and its extensions
+        if "video" not in request.FILES:
+            raise ParseError(detail="Video is required to create a flow.", code=400)
+        video_file = request.FILES["video"]
+        allowed_extensions = ["mp4", "avi", "mov"]
+        file_extension = video_file.name.split(".")[-1].lower()
+        if file_extension not in allowed_extensions:
+            raise ParseError(
+                detail="Invalid file format. Supported formats are: .mp4, .avi, .mov",
+                code=400,
+            )
+
+        # create frames from video
+        interval = request.data.get("interval", 3)
+        try:
+            frames = flow_build_service.cut_video_into_frames(video_file, interval)
+        except VideoProcessingException:
+            raise VideoProcessing()
+
         user = request.user
-
-        frames = request.FILES.getlist("frames")
-
-        if len(frames) == 0:
-            raise ParseError(detail="Frames are required to create a flow.", code=400)
-
-        interval = request.data.get("interval", 1)
         platforms = request.data.getlist("platforms", None)
         genres = request.data.getlist("genres", None)
 
-        data = request.data.copy()
-        serializer = FlowSimpleSerializer(data=data)
+        serializer = FlowSimpleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
         try:
@@ -146,22 +162,26 @@ class FlowLikeView(APIView, FlowVisibilityMixin):
 
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    serializer_class = None
+
+    def get_flow_for_user(self, request, pk):
+        return self.get_flow(pk, request.user)
 
     def post(self, request, *args, **kwargs):
-        user = request.user
-        flow = self.get_flow(self.kwargs["pk"], user)
-        flow_social_service.like_flow(flow=flow, user=user)
-        return Response(status=status.HTTP_201_CREATED)
+        flow = self.get_flow_for_user(request, self.kwargs["pk"])
+        flow = flow_social_service.like_flow(flow=flow, user=request.user)
+        serializer = LikesSerializer(flow)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def delete(self, request, *args, **kwargs):
-        user = request.user
-        flow = self.get_flow(self.kwargs["pk"], user)
+        flow = self.get_flow_for_user(request, self.kwargs["pk"])
         try:
-            flow_social_service.like_flow(flow=flow, user=user, like=False)
+            flow = flow_social_service.like_flow(
+                flow=flow, user=request.user, like=False
+            )
         except ObjectDoesNotExist:
             raise NotFound(detail=f"Like must be set before dislike.", code=404)
-        return Response(status=status.HTTP_200_OK)
+        serializer = LikesSerializer(flow)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class FlowCommentView(APIView, FlowVisibilityMixin):

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import tempfile
+from io import BytesIO
 from typing import Iterable, List
 
+import cv2
 from django.core.exceptions import ObjectDoesNotExist
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadedfile import (InMemoryUploadedFile,
+                                            SimpleUploadedFile)
 from PIL import Image
 
 from apps.interface_flows_api.exceptions import (
-    MLServicesUnavailableException, UnverifiedFlowExistsException)
+    MLServicesUnavailableException, UnverifiedFlowExistsException,
+    VideoProcessingException)
 from apps.interface_flows_api.models import (Connection, Flow, Genre, Platform,
                                              Screen, ScreenVisualProperties,
                                              User)
@@ -18,6 +23,40 @@ from apps.interface_flows_api.services.ml_provider import ml_service_provider
 
 class FlowBuildService:
     MAX_TIME_BETWEEN_SCREENS = 100
+
+    @staticmethod
+    def cut_video_into_frames(video_file, interval: int = 3):
+        try:
+            with tempfile.NamedTemporaryFile(
+                suffix=".mp4", delete=True
+            ) as temp_video_file:
+                for chunk in video_file.chunks():
+                    temp_video_file.write(chunk)
+                temp_video_file.flush()
+
+                video = cv2.VideoCapture(temp_video_file.name)
+                fps = video.get(cv2.CAP_PROP_FPS)
+                frame_interval = int(fps) * interval
+
+                frames = []
+                count = 0
+                success, frame = video.read()
+                while success:
+                    if count % frame_interval == 0:
+                        image = Image.fromarray(frame)
+                        img_byte_array = BytesIO()
+                        image.save(img_byte_array, format="JPEG")
+                        img_byte_array.seek(0)
+                        file_like_object = SimpleUploadedFile(
+                            f"image{count}.jpg", img_byte_array.getvalue()
+                        )
+                        frames.append(file_like_object)
+                    count += 1
+                    success, frame = video.read()
+                video.release()
+                return frames
+        except Exception:
+            raise VideoProcessingException
 
     @staticmethod
     def _get_screen_size(image_bytes: bytes) -> (int, int):
