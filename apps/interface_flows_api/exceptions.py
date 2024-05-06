@@ -13,6 +13,12 @@ class MLServicesUnavailableException(Exception):
     pass
 
 
+class MLServicesException(Exception):
+    """Exception is raised when the ML service does not return OK status."""
+
+    pass
+
+
 class PrivateFlowException(Exception):
     """Exception is raised when authorized user tries to get access to a private flow."""
 

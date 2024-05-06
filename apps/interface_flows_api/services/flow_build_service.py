@@ -5,14 +5,15 @@ from io import BytesIO
 from typing import Iterable, List
 
 import cv2
+import numpy as np
 from django.core.exceptions import ObjectDoesNotExist
-from django.core.files.uploadedfile import (InMemoryUploadedFile,
-                                            SimpleUploadedFile)
+from django.core.files.base import ContentFile
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from PIL import Image
 
 from apps.interface_flows_api.exceptions import (
-    MLServicesUnavailableException, UnverifiedFlowExistsException,
-    VideoProcessingException)
+    MLServicesException, MLServicesUnavailableException,
+    UnverifiedFlowExistsException, VideoProcessingException)
 from apps.interface_flows_api.models import (Connection, Flow, Genre, Platform,
                                              Screen, ScreenVisualProperties,
                                              User)
@@ -25,7 +26,7 @@ class FlowBuildService:
     MAX_TIME_BETWEEN_SCREENS = 100
 
     @staticmethod
-    def cut_video_into_frames(video_file, interval: int = 3):
+    def cut_video_into_frames(video_file: InMemoryUploadedFile, interval: int = 3):
         try:
             with tempfile.NamedTemporaryFile(
                 suffix=".mp4", delete=True
@@ -43,14 +44,7 @@ class FlowBuildService:
                 success, frame = video.read()
                 while success:
                     if count % frame_interval == 0:
-                        image = Image.fromarray(frame)
-                        img_byte_array = BytesIO()
-                        image.save(img_byte_array, format="JPEG")
-                        img_byte_array.seek(0)
-                        file_like_object = SimpleUploadedFile(
-                            f"image{count}.jpg", img_byte_array.getvalue()
-                        )
-                        frames.append(file_like_object)
+                        frames.append(frame)
                     count += 1
                     success, frame = video.read()
                 video.release()
@@ -59,22 +53,21 @@ class FlowBuildService:
             raise VideoProcessingException
 
     @staticmethod
-    def _get_screen_size(image_bytes: bytes) -> (int, int):
-        image = Image.open(image_bytes)
-        width, height = image.size
+    def _get_screen_size(image: np.array) -> (int, int):
+        height, width = image.shape[:2]
         return width, height
 
     @staticmethod
-    def _add_screen(flow: Flow, image: InMemoryUploadedFile) -> Screen:
-        flow_num = len(flow_selector.get_flows_by_title(flow.title))
-        f_flow_num = "{:02d}".format(flow_num)
-        screen_num = len(flow_selector.get_flow_screens(flow)) + 1
-        f_screen_num = "{:02d}".format(screen_num)
-        ext = image.name.split(".")[-1]
-        image.name = f"{flow.title}_{f_flow_num}_{f_screen_num}.{ext}"
-        return Screen.objects.create(
-            flow=flow, flow_screen_number=screen_num, image=image
-        )
+    def _np_to_image(image_np, image_format="JPEG", image_title="default"):
+        # convert from BGR to RGB
+        image_np = image_np[:, :, ::-1]
+        # create a file from correct array
+        image = Image.fromarray(image_np.astype("uint8"))
+        img_io = BytesIO()
+        image.save(img_io, format=image_format)
+        img_io.seek(0)
+        image_name = f"{image_title}.{image_format.lower()}"
+        return ContentFile(img_io.read(), name=image_name)
 
     @staticmethod
     def _update_flow_screen_pos(screen: Screen, x: int, y: int) -> None:
@@ -110,6 +103,17 @@ class FlowBuildService:
             pass
 
         return Connection.objects.create(screen_out=screen_out, screen_in=screen_in)
+
+    def _add_screen(self, flow: Flow, image: np.array) -> Screen:
+        flow_num = len(flow_selector.get_flows_by_title(flow.title))
+        f_flow_num = "{:02d}".format(flow_num)
+        screen_num = len(flow_selector.get_flow_screens(flow)) + 1
+        f_screen_num = "{:02d}".format(screen_num)
+        title = f"{flow.title}_{f_flow_num}_{f_screen_num}"
+        image = self._np_to_image(image, image_title=title)
+        return Screen.objects.create(
+            flow=flow, flow_screen_number=screen_num, image=image
+        )
 
     def _compute_screen_position(
         self, visited: set, graph: dict, node: Screen, x: int, y: int
@@ -148,7 +152,7 @@ class FlowBuildService:
     def create_new_flow(
         self,
         title: str,
-        frames: List[bytes],
+        video_file: InMemoryUploadedFile,
         user: User,
         flow_thumbnail_url: InMemoryUploadedFile = None,
         description: str = None,
@@ -159,11 +163,15 @@ class FlowBuildService:
         if flow_selector.if_user_reach_unverified_flows_limit(user):
             raise UnverifiedFlowExistsException
 
+        frames = self.cut_video_into_frames(video_file, interval)
+
         try:
             predictions = ml_service_provider.get_direct_graph(
                 frames, images_interval=interval
             )
         except MLServicesUnavailableException:
+            raise MLServicesUnavailableException
+        except MLServicesException:
             raise MLServicesUnavailableException
 
         width, height = self._get_screen_size(frames[0])
@@ -193,20 +201,22 @@ class FlowBuildService:
         previous_screen = None
         seen_screens_indices = set()
 
+        print(predictions)
+
         for i, prediction in enumerate(predictions):
-            if prediction["index"] not in seen_screens_indices:
+            if prediction.index not in seen_screens_indices:
                 screen = self._add_screen(
                     flow=flow,
-                    image=frames[prediction["index"]],
+                    image=frames[prediction.index],
                 )
-                seen_screens_indices.add(prediction["index"])
+                seen_screens_indices.add(prediction.index)
             else:
                 screen = Screen.objects.get(
-                    flow=flow, flow_screen_number=prediction["index"]
+                    flow=flow, flow_screen_number=prediction.index
                 )
             if (
                 i > 0
-                and predictions[i]["time_in"] - predictions[i - 1]["time_out"]
+                and predictions[i].time_in - predictions[i - 1].time_out
                 < self.MAX_TIME_BETWEEN_SCREENS
             ):
                 self._add_screens_connection(

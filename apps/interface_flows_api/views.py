@@ -9,9 +9,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.interface_flows_api.exceptions import (
-    MLServicesUnavailableException, MLServiceUnavailable, PrivateFlowException,
-    UnverifiedFlowExists, UnverifiedFlowExistsException, VideoProcessing,
-    VideoProcessingException)
+    MLServicesException, MLServicesUnavailableException, MLServiceUnavailable,
+    PrivateFlowException, UnverifiedFlowExists, UnverifiedFlowExistsException,
+    VideoProcessing, VideoProcessingException)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.serializers import *
 from apps.interface_flows_api.services.auth_service import auth_service
@@ -77,16 +77,10 @@ class FlowView(APIView):
                 code=400,
             )
 
-        # create frames from video
-        interval = request.data.get("interval", 3)
-        try:
-            frames = flow_build_service.cut_video_into_frames(video_file, interval)
-        except VideoProcessingException:
-            raise VideoProcessing()
-
         user = request.user
         platforms = request.data.getlist("platforms", None)
         genres = request.data.getlist("genres", None)
+        interval = request.data.get("interval", 3)
 
         serializer = FlowSimpleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -94,7 +88,7 @@ class FlowView(APIView):
         try:
             flow = flow_build_service.create_new_flow(
                 **serializer.validated_data,
-                frames=frames,
+                video_file=video_file,
                 user=user,
                 interval=interval,
                 platforms=platforms,
@@ -104,7 +98,11 @@ class FlowView(APIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except UnverifiedFlowExistsException:
             raise UnverifiedFlowExists()
+        except VideoProcessingException:
+            raise VideoProcessing()
         except MLServicesUnavailableException:
+            raise MLServiceUnavailable()
+        except MLServicesException:
             raise MLServiceUnavailable()
 
 

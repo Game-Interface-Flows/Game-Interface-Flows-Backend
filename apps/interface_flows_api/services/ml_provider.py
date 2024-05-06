@@ -1,32 +1,51 @@
+import base64
 import json
 import os
-from io import BytesIO
+from dataclasses import dataclass
 from typing import List
 
 import requests
-from django.core.files.uploadedfile import (SimpleUploadedFile,
-                                            TemporaryUploadedFile)
 
-from apps.interface_flows_api.exceptions import MLServicesUnavailableException
+from apps.interface_flows_api.exceptions import (
+    MLServicesException, MLServicesUnavailableException)
+
+
+@dataclass
+class MachineLearningServicePrediction:
+    index: int
+    time_in: int
+    time_out: int
 
 
 class MachineLearningServiceProvider:
     def __init__(self, host: str, port: str):
         self.ml_service_url = f"{host}:{port}"
 
-    def get_direct_graph(self, images, images_interval: int = 1) -> json:
-        files = [
-            ("images", (file.name, file.open().read(), file.content_type))
-            for file in images
-        ]
+    @staticmethod
+    def numpy_array_to_base64(arr):
+        return base64.b64encode(arr).decode("utf-8")
+
+    def get_direct_graph(
+        self, images, images_interval: int = 1
+    ) -> List[MachineLearningServicePrediction]:
+        encoded_images = [self.numpy_array_to_base64(image) for image in images]
+        data = json.dumps(
+            {"images": encoded_images, "images_interval": images_interval}
+        )
         try:
             response = requests.post(
-                f"{self.ml_service_url}/flow",
-                files=files,
-                json={images_interval: images_interval},
+                f"{self.ml_service_url}/test",
+                data=data,
+                headers={"Content-Type": "application/json"},
             )
-            flow_graph = response.json()
-            return flow_graph
+            if response.status_code != 200:
+                raise MLServicesException
+            predictions = response.json()
+            predictions = [
+                MachineLearningServicePrediction(**prediction)
+                for prediction in predictions
+            ]
+            return predictions
         except requests.exceptions.RequestException as e:
             raise MLServicesUnavailableException(f"ML service call failed: {e}")
 
