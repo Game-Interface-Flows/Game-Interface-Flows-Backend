@@ -81,7 +81,7 @@ class ScreenVisualProperties(Model):
 
 class Flow(Model):
     title = TextField()
-    description = TextField(null=True, blank=True)
+    source = TextField(null=True, blank=True, max_length=120)
     status = CharField(
         max_length=2,
         choices=FlowStatus.choices,

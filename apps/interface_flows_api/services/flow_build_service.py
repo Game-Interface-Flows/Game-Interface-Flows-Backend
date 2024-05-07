@@ -151,7 +151,7 @@ class FlowBuildService:
         video_file: InMemoryUploadedFile,
         user: User,
         flow_thumbnail_url: InMemoryUploadedFile = None,
-        description: str = None,
+        source: str = None,
         interval: int = 1,
         platforms: List[Platform] = None,
         genres: List[Genre] = None,
@@ -176,7 +176,7 @@ class FlowBuildService:
         flow = Flow.objects.create(
             author=user.profile,
             title=title,
-            description=description,
+            source=source,
             screens_properties=screens_properties,
         )
 

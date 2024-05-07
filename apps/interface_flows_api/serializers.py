@@ -79,22 +79,20 @@ class PlatformSerializer(serializers.ModelSerializer):
 
 class FlowSimpleSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
-    author = ProfileSerializer(write_only=True, required=False)
-    description = serializers.CharField(write_only=True, required=False)
     is_liked = serializers.SerializerMethodField()
     genres = GenreSerializer(many=True, read_only=True)
+    platforms = PlatformSerializer(many=True, read_only=True)
 
     class Meta:
         model = Flow
         fields = [
             "id",
             "title",
-            "description",
             "date",
             "total_likes",
             "flow_thumbnail_url",
-            "author",
             "genres",
+            "platforms",
             "is_liked",
         ]
 
