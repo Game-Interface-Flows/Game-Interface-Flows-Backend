@@ -5,8 +5,6 @@ CMD ["sudo", "apt-get", "install", "gcc"]
 RUN apt-get update \
     && apt-get -y install libpq-dev gcc
 
-RUN apt-get install -y libgl1
-
 RUN pip install --upgrade pip
 
 ENV PIP_ROOT_USER_ACTION=ignore

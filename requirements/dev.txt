@@ -1,3 +1,4 @@
 -r common.txt
 isort~=5.13.2
 black~=24.3.0
+opencv-python~=4.9.0.80
