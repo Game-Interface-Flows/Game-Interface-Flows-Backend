@@ -1,6 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 from rest_framework import status
 from rest_framework.authentication import TokenAuthentication
+from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.exceptions import NotFound, ParseError, PermissionDenied
 from rest_framework.generics import *
 from rest_framework.pagination import PageNumberPagination
@@ -229,3 +230,12 @@ class PlatformsView(ListAPIView):
 
     queryset = Platform.objects.all()
     serializer_class = PlatformSerializer
+
+
+class CustomObtainAuthToken(ObtainAuthToken):
+    def post(self, request, *args, **kwargs):
+        try:
+            return super().post(request, *args, **kwargs)
+        except Exception:
+            custom_response = {"details": "Unable to log in with provided credentials."}
+            return Response(custom_response, status=status.HTTP_400_BAD_REQUEST)

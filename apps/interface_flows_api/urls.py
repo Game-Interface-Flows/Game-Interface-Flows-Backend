@@ -1,5 +1,4 @@
 from django.urls import path
-from rest_framework.authtoken.views import ObtainAuthToken
 
 from apps.interface_flows_api.views import *
 
@@ -13,5 +12,5 @@ urlpatterns = [
     path("flows/<int:pk>/likes/", FlowLikeView.as_view(), name="likes"),
     path("flows/<int:pk>/comments/", FlowCommentView.as_view(), name="comments"),
     path("auth/signup/", CreateUserView.as_view(), name="signup"),
-    path("auth/token/", ObtainAuthToken.as_view(), name="login"),
+    path("auth/token/", CustomObtainAuthToken.as_view(), name="login"),
 ]
