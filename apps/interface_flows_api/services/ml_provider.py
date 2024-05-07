@@ -50,6 +50,7 @@ class MachineLearningServiceProvider:
             ]
             return predictions
         except requests.exceptions.RequestException as e:
+            print(e)
             raise MLServicesUnavailableException(f"ML service call failed: {e}")
 
 
