@@ -42,6 +42,7 @@ class MachineLearningServiceProvider:
                 headers={"Content-Type": "application/json"},
             )
             if response.status_code != 200:
+                print(response)
                 raise MLServicesException
             predictions = response.json()
             predictions = [
