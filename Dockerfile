@@ -1,4 +1,4 @@
-FROM python:3.8-slim-buster
+FROM python:3.11-slim-buster
 
 CMD ["sudo", "apt-get", "install", "gcc"]
 
@@ -12,6 +12,8 @@ ENV PIP_ROOT_USER_ACTION=ignore
 COPY requirements /app/requirements
 
 RUN pip install --no-cache-dir -r /app/requirements/prod.txt
+
+COPY .env /app/.env
 
 COPY manage.py /app
 
