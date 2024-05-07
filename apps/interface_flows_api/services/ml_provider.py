@@ -21,7 +21,7 @@ class MachineLearningServicePrediction:
 
 class MachineLearningServiceProvider:
     def __init__(self, host: str, port: str):
-        self.ml_service_url = f"{host}:{port}"
+        self.ml_service_url = f"http://{host}:{port}"
 
     @staticmethod
     def numpy_array_to_base64(image_np: np.array) -> str:
@@ -42,7 +42,6 @@ class MachineLearningServiceProvider:
                 headers={"Content-Type": "application/json"},
             )
             if response.status_code != 200:
-                print(response)
                 raise MLServicesException
             predictions = response.json()
             predictions = [
@@ -51,7 +50,6 @@ class MachineLearningServiceProvider:
             ]
             return predictions
         except requests.exceptions.RequestException as e:
-            print(e)
             raise MLServicesUnavailableException(f"ML service call failed: {e}")
 
 
