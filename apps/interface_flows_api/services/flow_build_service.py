@@ -100,15 +100,14 @@ class FlowBuildService:
 
         return Connection.objects.create(screen_out=screen_out, screen_in=screen_in)
 
-    def _add_screen(self, flow: Flow, image: np.array) -> Screen:
+    def _add_screen(self, flow: Flow, image: np.array, pid: int) -> Screen:
         flow_num = len(flow_selector.get_flows_by_title(flow.title))
         f_flow_num = "{:02d}".format(flow_num)
-        screen_num = len(flow_selector.get_flow_screens(flow)) + 1
-        f_screen_num = "{:02d}".format(screen_num)
+        f_screen_num = "{:02d}".format(pid)
         title = f"{flow.title}_{f_flow_num}_{f_screen_num}"
         image = self._np_to_image(image, image_title=title)
         return Screen.objects.create(
-            flow=flow, flow_screen_number=screen_num, image=image
+            flow=flow, flow_screen_number=pid, image=image
         )
 
     def _compute_screen_position(
@@ -206,6 +205,7 @@ class FlowBuildService:
                 screen = self._add_screen(
                     flow=flow,
                     image=frames[prediction.index],
+                    pid=prediction.index
                 )
                 seen_screens_indices.add(prediction.index)
             else:
