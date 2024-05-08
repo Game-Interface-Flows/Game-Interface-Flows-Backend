@@ -40,7 +40,7 @@ class FlowView(APIView):
         ext = file.name.split(".")[-1].lower()
         if ext not in allowed_extensions:
             raise ParseError(
-                detail=f"Invalid file format. Supported formats are: {", ".join(allowed_extensions)}",
+                detail=f'Invalid file format. Supported formats are: {", ".join(allowed_extensions)}',
                 code=400,
             )
 

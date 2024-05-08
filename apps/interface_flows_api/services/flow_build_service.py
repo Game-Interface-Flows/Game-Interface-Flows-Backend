@@ -12,9 +12,9 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 from apps.interface_flows_api.exceptions import (
     MLServicesException, MLServicesUnavailableException,
     UnverifiedFlowExistsException, VideoProcessingException)
-from apps.interface_flows_api.models import (Connection, Flow, Genre, Platform,
-                                             Screen, ScreenVisualProperties,
-                                             User, FlowStatus)
+from apps.interface_flows_api.models import (Connection, Flow, FlowStatus,
+                                             Genre, Platform, Screen,
+                                             ScreenVisualProperties, User)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.selectors.selector import SelectionOption
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
@@ -106,9 +106,7 @@ class FlowBuildService:
         f_screen_num = "{:02d}".format(pid)
         title = f"{flow.title}_{f_flow_num}_{f_screen_num}"
         image = self._np_to_image(image, image_title=title)
-        return Screen.objects.create(
-            flow=flow, flow_screen_number=pid, image=image
-        )
+        return Screen.objects.create(flow=flow, flow_screen_number=pid, image=image)
 
     def _compute_screen_position(
         self, visited: set, graph: dict, node: Screen, x: int, y: int
@@ -180,7 +178,7 @@ class FlowBuildService:
             title=title,
             source=source,
             screens_properties=screens_properties,
-            status=FlowStatus.VERIFIED
+            status=FlowStatus.VERIFIED,
         )
 
         platforms = flow_selector.get_platforms_by_names(
@@ -204,9 +202,7 @@ class FlowBuildService:
         for i, prediction in enumerate(predictions):
             if prediction.index not in seen_screens_indices:
                 screen = self._add_screen(
-                    flow=flow,
-                    image=frames[prediction.index],
-                    pid=prediction.index
+                    flow=flow, image=frames[prediction.index], pid=prediction.index
                 )
                 seen_screens_indices.add(prediction.index)
             else:
