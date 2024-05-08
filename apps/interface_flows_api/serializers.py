@@ -111,10 +111,17 @@ class FlowSerializer(ModelSerializer):
     genres = GenreSerializer(many=True, read_only=True)
     platforms = PlatformSerializer(many=True, read_only=True)
     screens_properties = ScreenVisualPropertiesSerializer(read_only=True)
+    is_liked = serializers.SerializerMethodField()
 
     class Meta:
         model = Flow
         exclude = ["flow_thumbnail_url"]
+
+    def get_is_liked(self, obj):
+        user = self.context.get("request").user
+        if user.is_authenticated:
+            return obj.likes.filter(user=user.profile).exists()
+        return False
 
 
 class LikesSerializer(ModelSerializer):
