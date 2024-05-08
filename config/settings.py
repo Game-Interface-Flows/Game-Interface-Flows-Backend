@@ -168,5 +168,5 @@ DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
 
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_DOMAIN = '.gameinterfaceflows.com'
-
+CSRF_COOKIE_DOMAIN = ".gameinterfaceflows.com"
+CSRF_TRUSTED_ORIGINS = ["https://api.gameinterfaceflows.com"]
