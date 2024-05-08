@@ -14,7 +14,7 @@ from apps.interface_flows_api.exceptions import (
     UnverifiedFlowExistsException, VideoProcessingException)
 from apps.interface_flows_api.models import (Connection, Flow, Genre, Platform,
                                              Screen, ScreenVisualProperties,
-                                             User)
+                                             User, FlowStatus)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.selectors.selector import SelectionOption
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
@@ -159,7 +159,10 @@ class FlowBuildService:
         if flow_selector.if_user_reach_unverified_flows_limit(user):
             raise UnverifiedFlowExistsException
 
-        frames = self.cut_video_into_frames(video_file, interval)
+        try:
+            frames = self.cut_video_into_frames(video_file, interval)
+        except VideoProcessingException:
+            raise VideoProcessingException
 
         try:
             predictions = ml_service_provider.get_direct_graph(
@@ -178,6 +181,7 @@ class FlowBuildService:
             title=title,
             source=source,
             screens_properties=screens_properties,
+            status=FlowStatus.VERIFIED
         )
 
         platforms = flow_selector.get_platforms_by_names(

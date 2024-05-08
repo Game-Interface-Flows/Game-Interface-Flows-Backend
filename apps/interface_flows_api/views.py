@@ -81,7 +81,7 @@ class FlowView(APIView):
         user = request.user
         platforms = request.data.getlist("platforms", None)
         genres = request.data.getlist("genres", None)
-        interval = request.data.get("interval", 3)
+        interval = int(request.data.get("interval", 3))
 
         serializer = FlowSimpleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -95,7 +95,7 @@ class FlowView(APIView):
                 platforms=platforms,
                 genres=genres,
             )
-            serializer = FlowSerializer(flow)
+            serializer = FlowSerializer(flow, context={"request": self.request})
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         except UnverifiedFlowExistsException:
             raise UnverifiedFlowExists()
