@@ -35,6 +35,15 @@ class FlowView(APIView):
     pagination_class = FlowsPagination
     object_name = "flow"
 
+    @staticmethod
+    def check_file_extension(file, allowed_extensions):
+        ext = file.name.split(".")[-1].lower()
+        if ext not in allowed_extensions:
+            raise ParseError(
+                detail=f"Invalid file format. Supported formats are: {", ".join(allowed_extensions)}",
+                code=400,
+            )
+
     def get_permissions(self):
         if self.request.method == "POST":
             self.authentication_classes = [TokenAuthentication]
@@ -70,13 +79,12 @@ class FlowView(APIView):
         if "video" not in request.FILES:
             raise ParseError(detail="Video is required to create a flow.", code=400)
         video_file = request.FILES["video"]
-        allowed_extensions = ["mp4", "avi", "mov"]
-        file_extension = video_file.name.split(".")[-1].lower()
-        if file_extension not in allowed_extensions:
-            raise ParseError(
-                detail="Invalid file format. Supported formats are: .mp4, .avi, .mov",
-                code=400,
-            )
+        self.check_file_extension(video_file, ["mp4", "avi", "mov"])
+
+        # check thumbnail
+        thumbnail_file = request.FILES["thumbnail"]
+        if thumbnail_file:
+            self.check_file_extension(thumbnail_file, ["png", "jpg", "jpeg"])
 
         user = request.user
         platforms = request.data.getlist("platforms", None)
@@ -90,6 +98,7 @@ class FlowView(APIView):
             flow = flow_build_service.create_new_flow(
                 **serializer.validated_data,
                 video_file=video_file,
+                thumbnail_file=thumbnail_file,
                 user=user,
                 interval=interval,
                 platforms=platforms,

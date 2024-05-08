@@ -149,7 +149,7 @@ class FlowBuildService:
         title: str,
         video_file: InMemoryUploadedFile,
         user: User,
-        flow_thumbnail_url: InMemoryUploadedFile = None,
+        thumbnail_file: InMemoryUploadedFile = None,
         source: str = None,
         interval: int = 1,
         platforms: List[Platform] = None,
@@ -193,8 +193,9 @@ class FlowBuildService:
         )
         flow.genres.set(genres)
 
-        if flow_thumbnail_url is not None:
-            flow.flow_thumbnail_url = flow_thumbnail_url
+        if thumbnail_file is not None:
+            thumbnail_file.name = title
+            flow.flow_thumbnail_url = thumbnail_file
             flow.save()
 
         previous_screen = None
