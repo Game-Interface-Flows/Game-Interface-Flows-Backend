@@ -82,8 +82,9 @@ class FlowView(APIView):
         self.check_file_extension(video_file, ["mp4", "avi", "mov"])
 
         # check thumbnail
-        thumbnail_file = request.FILES["thumbnail"]
-        if thumbnail_file:
+        thumbnail_file = None
+        if "thumbnail" in request.FILES:
+            thumbnail_file = request.FILES["thumbnail"]
             self.check_file_extension(thumbnail_file, ["png", "jpg", "jpeg"])
 
         user = request.user

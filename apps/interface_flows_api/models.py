@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import (BooleanField, CharField, DateField, ForeignKey,
                               ImageField, IntegerField, ManyToManyField, Model,
-                              OneToOneField, TextChoices, TextField)
+                              OneToOneField, TextChoices, TextField, Max)
 from django.utils.translation import gettext_lazy as _
 
 import apps.interface_flows_api.config as config
@@ -96,7 +96,7 @@ class Flow(Model):
     date = DateField(auto_now=False, auto_now_add=True)
     flow_thumbnail_url = ImageField(
         upload_to=config.AWS_FOLDER_THUMBNAILS,
-        default=f"{config.AWS_FOLDER_THUMBNAILS}/{config.DEFAULT_THUMBNAIL}",
+        blank=True,
     )
     genres = ManyToManyField(Genre, related_name="genres", blank=True)
     platforms = ManyToManyField(Platform, related_name="platforms", blank=True)
@@ -111,6 +111,22 @@ class Flow(Model):
     @property
     def total_likes(self) -> int:
         return len(Like.objects.filter(flow=self))
+
+    @property
+    def total_screens(self) -> int:
+        return len(Screen.objects.filter(flow=self))
+
+    @property
+    def average_connectivity(self) -> int:
+        return 0
+
+    @property
+    def max_x(self) -> int:
+        return Screen.objects.filter(flow=self).aggregate(Max('position_x'))['position_x__max']
+
+    @property
+    def max_y(self) -> int:
+        return Screen.objects.filter(flow=self).aggregate(Max('position_y'))['position_y__max']
 
     def __str__(self):
         return f"{self.title} ({self.id})"

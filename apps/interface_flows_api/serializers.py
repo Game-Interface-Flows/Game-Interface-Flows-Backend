@@ -105,6 +105,10 @@ class FlowSimpleSerializer(ModelSerializer):
 
 class FlowSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
+    total_screens = serializers.ReadOnlyField()
+    average_connectivity = serializers.ReadOnlyField()
+    max_x = serializers.ReadOnlyField()
+    max_y = serializers.ReadOnlyField()
     screens = ScreenSerializer(read_only=True, many=True)
     comments = CommentSerializer(read_only=True, many=True)
     author = ProfileSerializer(read_only=True)
