@@ -176,7 +176,7 @@ class Connection(Model):
     def source_anchor(self) -> Anchors:
         """Source anchor should be on right or bottom side."""
         if (
-            self.screen_out.position_y < self.screen_in.position_y
+            self.screen_out.position_y <= self.screen_in.position_y
             and self.screen_out.position_x >= self.screen_in.position_x
         ):
             return Anchors.BOTTOM
@@ -186,7 +186,7 @@ class Connection(Model):
     def target_anchor(self) -> Anchors:
         """Target anchor should be on top or left side."""
         if (
-            self.screen_in.position_y > self.screen_out.position_y
+            self.screen_in.position_y >= self.screen_out.position_y
             and self.screen_in.position_x <= self.screen_out.position_x
         ):
             return Anchors.TOP
