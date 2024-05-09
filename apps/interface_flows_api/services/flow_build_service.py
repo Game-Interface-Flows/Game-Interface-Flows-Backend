@@ -37,15 +37,14 @@ class FlowBuildService:
                 video = cv2.VideoCapture(temp_video_file.name)
                 fps = video.get(cv2.CAP_PROP_FPS)
                 frame_interval = int(fps) * interval
+                total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
                 frames = []
-                count = 0
-                success, frame = video.read()
-                while success:
-                    if count % frame_interval == 0:
-                        frames.append(frame)
-                    count += 1
+                for frame_index in range(0, total_frames, frame_interval):
+                    video.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
                     success, frame = video.read()
+                    if success:
+                        frames.append(frame)
                 video.release()
                 return frames
         except Exception:
