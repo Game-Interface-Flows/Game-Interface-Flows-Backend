@@ -1,8 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
 from django.db.models import (BooleanField, CharField, DateField, ForeignKey,
-                              ImageField, IntegerField, ManyToManyField, Model,
-                              OneToOneField, TextChoices, TextField, Max)
+                              ImageField, IntegerField, ManyToManyField, Max,
+                              Model, OneToOneField, TextChoices, TextField)
 from django.utils.translation import gettext_lazy as _
 
 import apps.interface_flows_api.config as config
@@ -122,11 +122,15 @@ class Flow(Model):
 
     @property
     def max_x(self) -> int:
-        return Screen.objects.filter(flow=self).aggregate(Max('position_x'))['position_x__max']
+        return Screen.objects.filter(flow=self).aggregate(Max("position_x"))[
+            "position_x__max"
+        ]
 
     @property
     def max_y(self) -> int:
-        return Screen.objects.filter(flow=self).aggregate(Max('position_y'))['position_y__max']
+        return Screen.objects.filter(flow=self).aggregate(Max("position_y"))[
+            "position_y__max"
+        ]
 
     def __str__(self):
         return f"{self.title} ({self.id})"
