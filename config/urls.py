@@ -41,11 +41,11 @@ urlpatterns = [
 ]
 
 if bool(int(os.getenv("DEBUG_MODE"))):
-    urlpatterns += path(
+    urlpatterns.append(path(
         "docs/swagger/",
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
-    )
+    ))
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
