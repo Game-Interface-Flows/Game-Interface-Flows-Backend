@@ -19,6 +19,7 @@ from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.selectors.selector import SelectionOption
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
 from apps.interface_flows_api.utils.encoder import numpy_array_to_io
+from apps.interface_flows_api.utils.resizer import resize_image
 
 
 class FlowBuildService:
@@ -57,12 +58,12 @@ class FlowBuildService:
 
     @staticmethod
     def _np_to_image(
-        image_np: np.array, image_format: str = "JPEG", image_title: str = "default"
+        image_np: np.array, image_format: str = "JPEG", filename: str = "default"
     ) -> ContentFile:
         buffered = numpy_array_to_io(image_np)
         buffered.seek(0)
-        image_name = f"{image_title}.{image_format.lower()}"
-        return ContentFile(buffered.read(), name=image_name)
+        filename = f"{filename}.{image_format.lower()}"
+        return ContentFile(buffered.read(), name=filename)
 
     @staticmethod
     def _update_flow_screen_pos(screen: Screen, x: int, y: int) -> None:
@@ -99,12 +100,26 @@ class FlowBuildService:
 
         return Connection.objects.create(screen_out=screen_out, screen_in=screen_in)
 
-    def _add_screen(self, flow: Flow, image: np.array, pid: int) -> Screen:
-        flow_num = len(flow_selector.get_flows_by_title(flow.title))
-        f_flow_num = "{:02d}".format(flow_num)
-        f_screen_num = "{:02d}".format(pid)
-        title = f"{flow.title}_{f_flow_num}_{f_screen_num}"
-        image = self._np_to_image(image, image_title=title)
+    @staticmethod
+    def _get_filename_prefix(title: str) -> str:
+        flow_num = len(flow_selector.get_flows_by_title(title)) + 1
+        flow_num = "{:02d}".format(flow_num)
+        prefix = f"{title}_{flow_num}"
+        return prefix
+
+    @staticmethod
+    def _add_thumbnail(flow: Flow, image: InMemoryUploadedFile, prefix) -> Flow:
+        buffed, f = resize_image(image)
+        image = ContentFile(buffed.getvalue())
+        image.name = f"{prefix}.{f}"
+        flow.flow_thumbnail_url = image
+        flow.save()
+        return flow
+
+    def _add_screen(self, flow: Flow, image: np.array, prefix: str, pid: int) -> Screen:
+        screen_num = "{:02d}".format(pid)
+        filename = f"{prefix}_{screen_num}"
+        image = self._np_to_image(image_np=image, filename=filename)
         return Screen.objects.create(flow=flow, flow_screen_number=pid, image=image)
 
     def _compute_screen_position(
@@ -171,6 +186,7 @@ class FlowBuildService:
 
         width, height = self._get_screen_size(frames[0])
         screens_properties = self._add_get_screen_properties(width, height)
+        prefix = self._get_filename_prefix(title)
 
         flow = Flow.objects.create(
             author=user.profile,
@@ -191,9 +207,7 @@ class FlowBuildService:
         flow.genres.set(genres)
 
         if thumbnail_file is not None:
-            thumbnail_file.name = title
-            flow.flow_thumbnail_url = thumbnail_file
-            flow.save()
+            self._add_thumbnail(flow=flow, image=thumbnail_file, prefix=prefix)
 
         previous_screen = None
         seen_screens_indices = set()
@@ -201,7 +215,10 @@ class FlowBuildService:
         for i, prediction in enumerate(predictions):
             if prediction.index not in seen_screens_indices:
                 screen = self._add_screen(
-                    flow=flow, image=frames[prediction.index], pid=prediction.index
+                    flow=flow,
+                    image=frames[prediction.index],
+                    pid=prediction.index,
+                    prefix=prefix,
                 )
                 seen_screens_indices.add(prediction.index)
             else:
