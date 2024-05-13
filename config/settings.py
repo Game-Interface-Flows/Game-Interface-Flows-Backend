@@ -178,7 +178,7 @@ CSRF_TRUSTED_ORIGINS = ["https://api.gameinterfaceflows.com"]
 
 # Celery
 
-CELERY_BROKER_URL = "redis://localhost:6379/0"
-CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_BROKER_URL = os.getenv("REDIS")
+CELERY_RESULT_BACKEND = os.getenv("REDIS")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
