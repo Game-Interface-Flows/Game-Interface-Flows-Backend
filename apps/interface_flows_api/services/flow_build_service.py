@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from typing import Iterable, List
 
 import cv2
 import numpy as np
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import (InMemoryUploadedFile,
                                             TemporaryUploadedFile)
 
@@ -28,19 +28,11 @@ class FlowBuildService:
 
     @staticmethod
     def save_temp_video(video_file: TemporaryUploadedFile) -> str:
-        temp_dir = "temp_videos"
-        if not os.path.exists(temp_dir):
-            os.makedirs(temp_dir)
-
-        file_path = os.path.join(temp_dir, video_file.name)
-
-        with open(file_path, "wb+") as destination:
-            for chunk in video_file.chunks():
-                destination.write(chunk)
-
-        video_file.close()
-
-        return file_path
+        """Video will be saved to s3 bucket."""
+        file_name = f"videos/{video_file.name}"
+        default_storage.save(file_name, ContentFile(video_file.read()))
+        print(default_storage.url(file_name))
+        return default_storage.url(file_name)
 
     @staticmethod
     def cut_video_into_frames(video_file_path: str, interval: int = 3) -> List:
@@ -57,7 +49,10 @@ class FlowBuildService:
                 success, frame = video.read()
                 if success:
                     frames.append(frame)
+
             video.release()
+            default_storage.delete(video_file_path)
+
             return frames
         except Exception:
             raise VideoProcessingException
