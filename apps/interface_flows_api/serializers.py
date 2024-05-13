@@ -65,23 +65,26 @@ class CommentSerializer(ModelSerializer):
         fields = "__all__"
 
 
-class GenreSerializer(serializers.ModelSerializer):
+class GenreSerializer(ModelSerializer):
     class Meta:
         model = Genre
         fields = "__all__"
 
 
-class PlatformSerializer(serializers.ModelSerializer):
+class PlatformSerializer(ModelSerializer):
     class Meta:
         model = Platform
         fields = "__all__"
 
 
-class FlowSimpleSerializer(ModelSerializer):
+class FlowBaseSerializer(ModelSerializer):
     total_likes = serializers.ReadOnlyField()
     is_liked = serializers.SerializerMethodField()
     genres = GenreSerializer(many=True, read_only=True)
     platforms = PlatformSerializer(many=True, read_only=True)
+    status = serializers.CharField(source="get_status_display", read_only=True)
+    process = serializers.CharField(source="get_process_display", read_only=True)
+    visibility = serializers.CharField(source="get_visibility_display", read_only=True)
 
     class Meta:
         model = Flow
@@ -90,10 +93,12 @@ class FlowSimpleSerializer(ModelSerializer):
             "title",
             "date",
             "total_likes",
-            "flow_thumbnail_url",
             "genres",
             "platforms",
             "is_liked",
+            "process",
+            "status",
+            "visibility",
         ]
 
     def get_is_liked(self, obj):
@@ -103,8 +108,12 @@ class FlowSimpleSerializer(ModelSerializer):
         return False
 
 
-class FlowSerializer(ModelSerializer):
-    total_likes = serializers.ReadOnlyField()
+class FlowSimpleSerializer(FlowBaseSerializer):
+    class Meta(FlowBaseSerializer.Meta):
+        fields = FlowBaseSerializer.Meta.fields + ["flow_thumbnail_url"]
+
+
+class FlowSerializer(FlowBaseSerializer):
     total_screens = serializers.ReadOnlyField()
     average_connectivity = serializers.ReadOnlyField()
     max_x = serializers.ReadOnlyField()
@@ -112,20 +121,19 @@ class FlowSerializer(ModelSerializer):
     screens = ScreenSerializer(read_only=True, many=True)
     comments = CommentSerializer(read_only=True, many=True)
     author = ProfileSerializer(read_only=True)
-    genres = GenreSerializer(many=True, read_only=True)
-    platforms = PlatformSerializer(many=True, read_only=True)
     screens_properties = ScreenVisualPropertiesSerializer(read_only=True)
-    is_liked = serializers.SerializerMethodField()
 
-    class Meta:
-        model = Flow
-        exclude = ["flow_thumbnail_url"]
-
-    def get_is_liked(self, obj):
-        user = self.context.get("request").user
-        if user.is_authenticated:
-            return obj.likes.filter(user=user.profile).exists()
-        return False
+    class Meta(FlowBaseSerializer.Meta):
+        fields = FlowBaseSerializer.Meta.fields + [
+            "total_screens",
+            "average_connectivity",
+            "max_x",
+            "max_y",
+            "screens",
+            "comments",
+            "author",
+            "screens_properties",
+        ]
 
 
 class LikesSerializer(ModelSerializer):

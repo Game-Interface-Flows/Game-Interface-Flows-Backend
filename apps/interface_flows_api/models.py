@@ -53,6 +53,12 @@ class FlowVisibility(TextChoices):
     PRIVATE = "PV", _("Private")
 
 
+class FlowProcessStatus(TextChoices):
+    SUCCESS = "COMPLETED", _("Completed")
+    FAIL = "FAIL", _("Fail")
+    IN_PROCESS = "IN_PROCESS", _("In Process")
+
+
 class ScreenVisualProperties(Model):
     width = IntegerField(default=480)
     height = IntegerField(default=270)
@@ -86,6 +92,11 @@ class Flow(Model):
         max_length=2,
         choices=FlowStatus.choices,
         default=FlowStatus.ON_MODERATION,
+    )
+    process = CharField(
+        max_length=20,
+        choices=FlowProcessStatus.choices,
+        default=FlowProcessStatus.IN_PROCESS,
     )
     visibility = CharField(
         max_length=2, choices=FlowVisibility.choices, default=FlowVisibility.PUBLIC

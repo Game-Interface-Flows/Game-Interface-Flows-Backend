@@ -1,20 +1,21 @@
 from __future__ import annotations
 
-import tempfile
+import os
 from typing import Iterable, List
 
 import cv2
 import numpy as np
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.files.base import ContentFile
-from django.core.files.uploadedfile import InMemoryUploadedFile
+from django.core.files.uploadedfile import (InMemoryUploadedFile,
+                                            TemporaryUploadedFile)
 
 from apps.interface_flows_api.exceptions import (
     MLServicesException, MLServicesUnavailableException,
     UnverifiedFlowExistsException, VideoProcessingException)
 from apps.interface_flows_api.models import (Connection, Flow, FlowStatus,
-                                             Genre, Platform, Screen,
-                                             ScreenVisualProperties, User)
+                                             Screen, ScreenVisualProperties,
+                                             User)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.selectors.selector import SelectionOption
 from apps.interface_flows_api.services.ml_provider import ml_service_provider
@@ -26,28 +27,38 @@ class FlowBuildService:
     MAX_TIME_BETWEEN_SCREENS = 100
 
     @staticmethod
-    def cut_video_into_frames(video_file: InMemoryUploadedFile, interval: int = 3):
+    def save_temp_video(video_file: TemporaryUploadedFile) -> str:
+        temp_dir = "temp_videos"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+
+        file_path = os.path.join(temp_dir, video_file.name)
+
+        with open(file_path, "wb+") as destination:
+            for chunk in video_file.chunks():
+                destination.write(chunk)
+
+        video_file.close()
+
+        return file_path
+
+    @staticmethod
+    def cut_video_into_frames(video_file_path: str, interval: int = 3) -> List:
         try:
-            with tempfile.NamedTemporaryFile(
-                suffix=".mp4", delete=True
-            ) as temp_video_file:
-                for chunk in video_file.chunks():
-                    temp_video_file.write(chunk)
-                temp_video_file.flush()
+            video = cv2.VideoCapture(video_file_path)
 
-                video = cv2.VideoCapture(temp_video_file.name)
-                fps = video.get(cv2.CAP_PROP_FPS)
-                frame_interval = int(fps) * interval
-                total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = video.get(cv2.CAP_PROP_FPS)
+            frame_interval = int(fps) * interval
+            total_frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
 
-                frames = []
-                for frame_index in range(0, total_frames, frame_interval):
-                    video.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
-                    success, frame = video.read()
-                    if success:
-                        frames.append(frame)
-                video.release()
-                return frames
+            frames = []
+            for frame_index in range(0, total_frames, frame_interval):
+                video.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
+                success, frame = video.read()
+                if success:
+                    frames.append(frame)
+            video.release()
+            return frames
         except Exception:
             raise VideoProcessingException
 
@@ -143,71 +154,8 @@ class FlowBuildService:
             return y
         return None
 
-    def _build_graph(self, flow: Flow) -> Iterable[Screen]:
-        screens = flow_selector.get_flow_screens(flow)
-        graph = {}
-        for screen in screens:
-            graph[screen] = flow_selector.get_connected_screens(screen)
-        visited = set()
-        y = 0
-        while len(graph) != 0:
-            current_node = max(graph, key=lambda x: len(graph[x]))
-            y = self._compute_screen_position(visited, graph, current_node, 0, y)
-            y += 1
-        return screens
-
-    def create_new_flow(
-        self,
-        title: str,
-        video_file: InMemoryUploadedFile,
-        user: User,
-        thumbnail_file: InMemoryUploadedFile = None,
-        source: str = None,
-        interval: int = 1,
-        platforms: List[Platform] = None,
-        genres: List[Genre] = None,
-    ) -> Flow:
-        if flow_selector.if_user_reach_unverified_flows_limit(user):
-            raise UnverifiedFlowExistsException
-
-        try:
-            frames = self.cut_video_into_frames(video_file, interval)
-        except VideoProcessingException:
-            raise VideoProcessingException
-
-        try:
-            predictions = ml_service_provider.get_direct_graph(
-                frames, images_interval=interval
-            )
-        except MLServicesUnavailableException:
-            raise MLServicesUnavailableException
-        except MLServicesException:
-            raise MLServicesUnavailableException
-
-        width, height = self._get_screen_size(frames[0])
-        screens_properties = self._add_get_screen_properties(width, height)
-        prefix = self._get_filename_prefix(title)
-
-        flow = Flow.objects.create(
-            author=user.profile,
-            title=title,
-            source=source,
-            screens_properties=screens_properties,
-            status=FlowStatus.VERIFIED,
-        )
-
-        platforms = flow_selector.get_platforms_by_names(
-            names=platforms, option=SelectionOption.nothing
-        )
-        flow.platforms.set(platforms)
-
-        genres = flow_selector.get_genres_by_names(
-            names=genres, option=SelectionOption.nothing
-        )
-        flow.genres.set(genres)
-
-        if thumbnail_file is not None:
-            self._add_thumbnail(flow=flow, image=thumbnail_file, prefix=prefix)
+    def _compute_connections(self, predictions, flow: Flow, frames) -> None:
+        prefix = self._get_filename_prefix(flow.title)
 
         previous_screen = None
         seen_screens_indices = set()
@@ -236,7 +184,94 @@ class FlowBuildService:
 
             previous_screen = screen
 
-        self._build_graph(flow)
+    def _compute_screens(self, flow: Flow) -> Iterable[Screen]:
+        screens = flow_selector.get_flow_screens(flow)
+        graph = {}
+        for screen in screens:
+            graph[screen] = flow_selector.get_connected_screens(screen)
+        visited = set()
+        y = 0
+        while len(graph) != 0:
+            current_node = max(graph, key=lambda x: len(graph[x]))
+            y = self._compute_screen_position(visited, graph, current_node, 0, y)
+            y += 1
+        return screens
+
+    def init_flow(
+        self,
+        title: str,
+        user: User,
+        thumbnail_file: InMemoryUploadedFile = None,
+        source: str = None,
+        platforms: List[str] = None,
+        genres: List[str] = None,
+    ) -> Flow:
+        """Function to init an empty flow."""
+        if flow_selector.if_user_reach_unverified_flows_limit(user):
+            raise UnverifiedFlowExistsException
+
+        flow = Flow.objects.create(
+            author=user.profile,
+            title=title,
+            source=source,
+            status=FlowStatus.VERIFIED,
+        )
+
+        platforms = flow_selector.get_platforms_by_names(
+            names=platforms, option=SelectionOption.nothing
+        )
+        flow.platforms.set(platforms)
+
+        genres = flow_selector.get_genres_by_names(
+            names=genres, option=SelectionOption.nothing
+        )
+        flow.genres.set(genres)
+
+        prefix = self._get_filename_prefix(title)
+
+        if thumbnail_file is not None:
+            self._add_thumbnail(flow=flow, image=thumbnail_file, prefix=prefix)
+
+        return flow
+
+    def build_flow(
+        self,
+        flow: Flow,
+        video_file_path: str,
+        interval: int = 3,
+    ) -> Flow:
+        """Function to fill existing flow with images."""
+        # video to frames
+        try:
+            frames = self.cut_video_into_frames(video_file_path, interval)
+        except VideoProcessingException:
+            raise VideoProcessingException
+
+        # get predictions
+        try:
+            predictions = ml_service_provider.get_direct_graph(
+                frames, images_interval=interval
+            )
+        except MLServicesUnavailableException:
+            raise MLServicesUnavailableException
+        except MLServicesException:
+            raise MLServicesUnavailableException
+
+        # get screen properties
+        width, height = self._get_screen_size(frames[0])
+        screens_properties = self._add_get_screen_properties(width, height)
+        flow.screens_properties = screens_properties
+
+        # compute connections between screens and create them
+        self._compute_connections(predictions=predictions, flow=flow, frames=frames)
+
+        # compute screens positions
+        self._compute_screens(flow)
+
+        # remove video
+        os.remove(video_file_path)
+
+        flow.save()
 
         return flow
 

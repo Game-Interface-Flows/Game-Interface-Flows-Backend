@@ -29,5 +29,7 @@ docker_build:
 docker_run:
 	docker run -p 8000:8000 game-interface-flows-backend
 
+celery:
+	celery -A config worker --pool solo -l info
 
 .PHONY: run

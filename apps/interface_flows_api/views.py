@@ -9,10 +9,9 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.interface_flows_api.exceptions import (
-    MLServicesException, MLServicesUnavailableException, MLServiceUnavailable,
-    PrivateFlowException, UnverifiedFlowExists, UnverifiedFlowExistsException,
-    VideoProcessing, VideoProcessingException)
+from apps.interface_flows_api.exceptions import (PrivateFlowException,
+                                                 UnverifiedFlowExists,
+                                                 UnverifiedFlowExistsException)
 from apps.interface_flows_api.selectors.flow_selector import flow_selector
 from apps.interface_flows_api.serializers import *
 from apps.interface_flows_api.services.auth_service import auth_service
@@ -20,6 +19,7 @@ from apps.interface_flows_api.services.flow_build_service import \
     flow_build_service
 from apps.interface_flows_api.services.flow_social_service import \
     flow_social_service
+from apps.interface_flows_api.tasks import flow_builder
 
 
 class FlowView(APIView):
@@ -87,34 +87,37 @@ class FlowView(APIView):
             thumbnail_file = request.FILES["thumbnail"]
             self.check_file_extension(thumbnail_file, ["png", "jpg", "jpeg"])
 
+        # get additional request data
         user = request.user
         platforms = request.data.getlist("platforms", None)
         genres = request.data.getlist("genres", None)
         interval = int(request.data.get("interval", 3))
 
+        # step 0: check if data is valid
         serializer = FlowSimpleSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        # step 1: create blank flow with info
         try:
-            flow = flow_build_service.create_new_flow(
+            flow = flow_build_service.init_flow(
                 **serializer.validated_data,
-                video_file=video_file,
-                thumbnail_file=thumbnail_file,
                 user=user,
-                interval=interval,
                 platforms=platforms,
                 genres=genres,
+                thumbnail_file=thumbnail_file,
             )
-            serializer = FlowSerializer(flow, context={"request": self.request})
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
         except UnverifiedFlowExistsException:
             raise UnverifiedFlowExists()
-        except VideoProcessingException:
-            raise VideoProcessing()
-        except MLServicesUnavailableException:
-            raise MLServiceUnavailable()
-        except MLServicesException:
-            raise MLServiceUnavailable()
+
+        # step 2: if everything is ok, we can save a video
+        video_path = flow_build_service.save_temp_video(video_file)
+
+        # step 3: create a delayed task for graph creation
+        flow_builder.delay(
+            flow_id=flow.id, interval=interval, video_file_path=video_path
+        )
+
+        return Response({"status": "accepted"}, status=status.HTTP_200_OK)
 
 
 class MyFlowView(ListAPIView):
