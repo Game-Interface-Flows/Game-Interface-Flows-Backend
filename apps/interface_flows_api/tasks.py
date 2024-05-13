@@ -1,4 +1,5 @@
 import logging
+import os
 
 from celery import shared_task
 
@@ -21,4 +22,5 @@ def flow_builder(flow_id: int, video_file_path: str, interval: int):
     except Exception as e:
         logger.error(f"Error processing flow {flow_id}: {e}", exc_info=True)
         flow.process = FlowProcessStatus.FAIL
+    os.remove(video_file_path)
     flow.save()

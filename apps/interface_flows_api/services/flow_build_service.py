@@ -268,9 +268,6 @@ class FlowBuildService:
         # compute screens positions
         self._compute_screens(flow)
 
-        # remove video
-        os.remove(video_file_path)
-
         flow.save()
 
         return flow
