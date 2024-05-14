@@ -5,7 +5,8 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Model
 
 from apps.interface_flows_api.exceptions import PrivateFlowException
-from apps.interface_flows_api.models import (Connection, Flow, FlowStatus,
+from apps.interface_flows_api.models import (Connection, Flow,
+                                             FlowProcessStatus, FlowStatus,
                                              FlowVisibility, Genre, Platform,
                                              Screen)
 from apps.interface_flows_api.selectors.selector import (SelectionOption,
@@ -84,8 +85,10 @@ class FlowSelector(Selector):
         order options: asc or desc
         """
         flows = Flow.objects.filter(
-            visibility=FlowVisibility.PUBLIC, status=FlowStatus.VERIFIED
-        )
+            visibility=FlowVisibility.PUBLIC,
+            status=FlowStatus.VERIFIED,
+            process=FlowProcessStatus.SUCCESS,
+        ).distinct()
         if genres:
             genres = self.get_genres_by_names(genres)
             flows = flows.filter(genres__in=genres).distinct()
