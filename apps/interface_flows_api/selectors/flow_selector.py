@@ -52,7 +52,7 @@ class FlowSelector(Selector):
 
     @staticmethod
     def get_my_flows(user: User) -> Iterable[Flow]:
-        return Flow.objects.filter(author=user.profile)
+        return Flow.objects.filter(author=user.profile).order_by("-date")
 
     @staticmethod
     def get_liked_flows(user: User) -> Iterable[Flow]:
