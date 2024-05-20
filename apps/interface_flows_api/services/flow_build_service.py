@@ -31,7 +31,6 @@ class FlowBuildService:
         """Video will be saved to s3 bucket."""
         file_name = f"videos/{video_file.name}"
         default_storage.save(file_name, ContentFile(video_file.read()))
-        print(default_storage.url(file_name))
         return default_storage.url(file_name)
 
     @staticmethod
